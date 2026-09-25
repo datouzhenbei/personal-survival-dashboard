@@ -185,6 +185,12 @@ export function renderHero(container, ctx) {
         ]),
       );
     } else {
+      // 结论行放在高亮条「上方」：让卡 B 与卡 A 结构一致（大数字 → 小字行 → 高亮条），
+      // 两张卡等高时两条高亮条才会落在同一水平线上。
+      // 放在条下方会把卡 B 的条整体顶高约一行，与卡 A 的条错开（v1.3.1 观感问题）。
+      const verdict = savingsVerdict(r.depletionDate, lifeEnd);
+      if (verdict) subParts.push(h('p', { class: 'card-sub-note', text: verdict }));
+
       subParts.push(
         hlStrip(
           [
@@ -196,8 +202,6 @@ export function renderHero(container, ctx) {
           stripPill('耗尽', formatDate(r.depletionDate)),
         ),
       );
-      const verdict = savingsVerdict(r.depletionDate, lifeEnd);
-      if (verdict) subParts.push(h('p', { class: 'card-sub-note', text: verdict }));
     }
 
     cardB = createStatCard({

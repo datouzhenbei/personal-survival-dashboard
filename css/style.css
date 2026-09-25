@@ -402,6 +402,14 @@ main.container {
   min-height: 1.5em;
 }
 
+/* 副信息区（小字行 + 高亮条）吸到卡片底部。
+   首屏两卡在栅格里等高，贴底后「高亮条」的底边必然齐平 —— 这样即便
+   两侧小字行高度有 1-2px 出入，两条高亮条也不会错开。
+   单列（<1024px）时卡片高度自适应、没有多余空间，此规则自动失效。 */
+.stat-card > :last-child {
+  margin-top: auto;
+}
+
 .stat-card--accent .stat-card__value {
   color: var(--accent);
 }
@@ -531,10 +539,14 @@ main.container {
   border-color: rgba(34, 197, 94, 0.26);
 }
 
-/* 展开结论行：存款耗尽日与寿命终点谁先到 */
+/* 结论行：存款耗尽日与寿命终点谁先到。
+   排在卡 B 高亮条的「上方」，与卡 A 的「已过 N 年 M 天」同处一行位置。
+   排版度量刻意与 .elapsed-line 对齐（同字号、同单行限制）：
+   行高一致 → 两张卡的「小字行 + 高亮条」上下都齐。 */
 .card-sub-note {
-  font-size: var(--fs-xs);
+  font-size: var(--fs-sm);
   color: var(--text-secondary);
+  white-space: nowrap;
 }
 
 .card-sub-note::before {
