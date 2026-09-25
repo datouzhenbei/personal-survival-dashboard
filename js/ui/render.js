@@ -31,6 +31,11 @@ import {
 
 /* ---------------- 通用小部件 ---------------- */
 
+/* 与 core/life.js 保持同一时间口径（365.25 天/年），
+   避免「已过」在 UI 层用另一套算法算出的天数与「剩余」对不上。 */
+const DAY_MS = 24 * 60 * 60 * 1000;
+const YEAR_MS = 365.25 * DAY_MS;
+
 function sectionHead(title, iconName) {
   return h('div', { class: 'section-head' }, [
     icon(iconName, 18),
@@ -38,10 +43,12 @@ function sectionHead(title, iconName) {
   ]);
 }
 
-function tickingRemaining(stats) {
-  if (stats.isOver) return `已超过设定预期寿命 ${stats.breakdown.days} 天`;
-  const b = stats.breakdown;
-  return `${b.years} 年 ${b.remDays} 天 ${formatClock(b.hours, b.minutes, b.seconds)}`;
+/** 已度过时长拆成「N 年 M 天」 */
+function elapsedYearsDays(stats) {
+  const ms = Math.max(0, stats.livedMs || 0);
+  const years = Math.floor(ms / YEAR_MS);
+  const remDays = Math.floor((ms % YEAR_MS) / DAY_MS);
+  return `${years} 年 ${remDays} 天`;
 }
 
 /** 剩余寿命拆成「N 年 M 天」（不含时分秒，供高亮条大号展示） */
@@ -107,7 +114,17 @@ export function renderHero(container, ctx) {
     const s = ctx.lifeStats;
     const tone = s.isOver ? 'success' : 'accent';
 
-    // 高亮条：左侧「N 年 M 天 + 秒级时钟」，右侧 GG 日期胶囊
+    // 「已过 N 年 M 天」：由原「时间详情」卡上移到卡 A，紧贴主数字下方成一行小字。
+    // 不塞进高亮条 —— 实测会让「GG 日期」胶囊被挤到第二行左对齐，反而破坏首屏观感。
+    const elapsedValEl = h('span', { class: 'elapsed-line__val', text: elapsedYearsDays(s) });
+    const elapsedLine = h('p', { class: 'elapsed-line' }, [
+      h('span', { class: 'elapsed-line__key', text: '已过' }),
+      // 显式空格文本节点：复制/朗读出来是「已过 36 年 253 天」，而不是「已过36 年 253 天」
+      ' ',
+      elapsedValEl,
+    ]);
+
+    // 高亮条：左侧「还剩 N 年 M 天 + 秒级时钟」，右侧 GG 日期胶囊
     const yearsDaysEl = h('span', { class: 'hl-strip__main', text: remainingYearsDays(s) });
     const clockEl = h('span', { class: 'hl-strip__clock', text: remainingClock(s) });
 
@@ -116,7 +133,10 @@ export function renderHero(container, ctx) {
       iconName: 'hourglass',
       value: formatInt(s.breakdown.days),
       unit: '天',
-      subNode: hlStrip([yearsDaysEl, clockEl], ggPill(s.endDate, { isOver: s.isOver })),
+      subNode: [
+        elapsedLine,
+        hlStrip([yearsDaysEl, clockEl], ggPill(s.endDate, { isOver: s.isOver })),
+      ],
       subClass: 'card-sub-stack',
       tone,
     });
@@ -130,6 +150,7 @@ export function renderHero(container, ctx) {
 
     updateA = (stats) => {
       cardA.refs.value.textContent = formatInt(stats.breakdown.days);
+      elapsedValEl.textContent = elapsedYearsDays(stats);
       yearsDaysEl.textContent = remainingYearsDays(stats);
       clockEl.textContent = remainingClock(stats);
     };
@@ -268,13 +289,6 @@ function renderLifeGuide(ctx) {
   ]);
 }
 
-function detailRow(label, valueNode, id) {
-  return h('div', { class: 'detail-row' }, [
-    h('dt', { text: label }),
-    h('dd', id ? { id } : {}, [valueNode]),
-  ]);
-}
-
 /** 已配置后的生命模块 */
 function renderLifePanel(ctx) {
   const profile = ctx.state.profile;
@@ -363,72 +377,16 @@ function renderLifePanel(ctx) {
             ? `已超过设定预期寿命 ${stats.breakdown.days} 天，愿每一天都值得`
             : `按预期寿命 ${stats.lifeExpectancy} 岁线性换算`,
         })
-      : null,
+      : // 原「时间详情」卡已移除（V1.2.1 极简化），计算异常时在此保留错误出口，
+        // 避免参数有问题却只显示一个「暂不可用」的环。
+        ctx.lifeError
+        ? h('p', { class: 'card__error', text: ctx.lifeError })
+        : null,
   ]);
-
-  // —— 详情列表 ——
-  let remainingNode = h('span', { text: '—' });
-  let detailsCard;
-  if (stats) {
-    const s = stats;
-    const livedYears = s.age;
-    const livedRemDays = Math.min(
-      364,
-      Math.max(0, Math.floor((s.ageDecimal - livedYears) * 365.25)),
-    );
-
-    const birthdayText =
-      s.daysUntilNextBirthday === 0
-        ? '就是今天，生日快乐'
-        : `距 ${s.daysUntilNextBirthday} 天`;
-    const now = new Date();
-    const retired = s.retirementDate.getTime() <= now.getTime();
-    const retirementText = retired
-      ? '已到退休年龄'
-      : `距 ${s.daysUntilRetirement} 天`;
-
-    remainingNode = h('span', { class: 'tick-text', text: tickingRemaining(s) });
-
-    detailsCard = h('div', { class: 'card details-card' }, [
-      h('h3', { class: 'card__title', text: '时间详情' }),
-      h('dl', { class: 'detail-list' }, [
-        detailRow(
-          '当前年龄',
-          `${s.age} 岁（约 ${s.ageDecimal.toFixed(1)} 岁）`,
-        ),
-        detailRow('出生日期', formatDate(s.birthDate)),
-        detailRow('已度过', `${livedYears} 年 ${livedRemDays} 天`),
-        detailRow(
-          s.isOver ? '超出预期' : '剩余时间',
-          remainingNode,
-          'life-remaining',
-        ),
-        detailRow(
-          '下次生日',
-          h('span', {}, [
-            formatDate(s.nextBirthday),
-            h('span', { class: 'detail-sub', text: `（${birthdayText}）` }),
-          ]),
-        ),
-        detailRow(
-          '退休日',
-          h('span', {}, [
-            formatDate(s.retirementDate),
-            h('span', { class: 'detail-sub', text: `（${retirementText}）` }),
-          ]),
-        ),
-      ]),
-    ]);
-  } else {
-    detailsCard = h('div', { class: 'card details-card' }, [
-      h('h3', { class: 'card__title', text: '时间详情' }),
-      h('p', { class: 'card__error', text: ctx.lifeError || '当前参数无法计算，请检查输入。' }),
-    ]);
-  }
 
   return h('div', { class: 'life-grid' }, [
     ringCard,
-    h('div', { class: 'life-side' }, [paramsCard, detailsCard]),
+    h('div', { class: 'life-side' }, [paramsCard]),
   ]);
 }
 
@@ -438,14 +396,10 @@ export function renderLifeSection(container, ctx) {
     container.appendChild(renderLifeGuide(ctx));
     return null;
   }
-  const panel = renderLifePanel(ctx);
-  container.appendChild(panel);
-
-  // 每秒仅更新「剩余时间」文本节点
-  return (stats) => {
-    const node = document.getElementById('life-remaining');
-    if (node) node.textContent = tickingRemaining(stats);
-  };
+  container.appendChild(renderLifePanel(ctx));
+  // 「剩余时间」文本已并入首屏卡 A 的高亮条，由 renderHero 的 updater 每秒刷新，
+  // 此处无需再注册第二个 updater。
+  return null;
 }
 
 /* ---------------- 存款生存计算器模块 ---------------- */

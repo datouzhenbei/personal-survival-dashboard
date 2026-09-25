@@ -9,7 +9,7 @@ export const Config = {
   // 数据 schema 版本，便于未来迁移（备份文件中的 schemaVersion 即此值）
   STORAGE_VERSION: 1,
   // 应用版本，仅用于页脚显示与备份文件溯源
-  APP_VERSION: 'v1.2.0',
+  APP_VERSION: 'v1.2.1',
 
   KEYS: {
     PROFILE: 'psd_profile',     // 个人档案：出生日期、性别、退休年龄

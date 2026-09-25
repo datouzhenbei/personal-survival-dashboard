@@ -123,7 +123,6 @@ main.container {
 .stat-card__value,
 .stat-card__unit,
 .result-hero__value,
-.tick-text,
 .data-table td.num,
 .total-item__value,
 .burn-result__value,
@@ -437,6 +436,29 @@ main.container {
   line-height: 1.2;
   letter-spacing: -0.01em;
   color: var(--accent);
+  font-variant-numeric: tabular-nums;
+}
+
+/* 「已过 N 年 M 天」：从已删除的「时间详情」卡上移到首屏卡 A 的主数字下方。
+   刻意用小字 + 次级色，只作对照量，不抢「剩余」主数字。
+   注意：不要塞进 .hl-strip —— 会把 GG 胶囊挤到第二行左对齐（360-1440px 实测）。
+   用 inline 排版（非 flex）让标签与数值之间的真实空格生效，视觉间距由 key 的 margin 提供。 */
+.elapsed-line {
+  font-size: var(--fs-sm);
+  color: var(--text-secondary);
+  white-space: nowrap;
+}
+
+.elapsed-line__key {
+  font-size: var(--fs-xs);
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  color: var(--text-muted);
+  margin-right: 4px;
+}
+
+.elapsed-line__val {
+  font-weight: 550;
   font-variant-numeric: tabular-nums;
 }
 
@@ -774,58 +796,6 @@ main.container {
   border: 1px dashed var(--border-strong);
   border-radius: 50%;
   color: var(--text-muted);
-}
-
-/* 详情列表 */
-
-.details-card {
-  display: flex;
-  flex-direction: column;
-}
-
-.detail-list {
-  display: flex;
-  flex-direction: column;
-}
-
-.detail-row {
-  display: flex;
-  align-items: baseline;
-  justify-content: space-between;
-  gap: var(--sp-4);
-  padding: var(--sp-3) 0;
-  border-bottom: 1px solid var(--border);
-}
-
-.detail-row:first-child {
-  padding-top: 0;
-}
-
-.detail-row:last-child {
-  border-bottom: 0;
-  padding-bottom: 0;
-}
-
-.detail-row dt {
-  font-size: var(--fs-sm);
-  color: var(--text-muted);
-  flex: none;
-}
-
-.detail-row dd {
-  font-size: var(--fs-sm);
-  color: var(--text-primary);
-  text-align: right;
-  overflow-wrap: anywhere;
-}
-
-.detail-sub {
-  color: var(--text-muted);
-}
-
-.tick-text {
-  color: var(--accent);
-  font-weight: 550;
 }
 
 /* ---------------- 引导 / 空状态 / 行内提示 ---------------- */
@@ -1395,16 +1365,6 @@ main.container {
 
   .ring-center__pct {
     font-size: 2rem;
-  }
-
-  .detail-row {
-    flex-direction: column;
-    align-items: flex-start;
-    gap: 2px;
-  }
-
-  .detail-row dd {
-    text-align: left;
   }
 
   .totals-grid {
