@@ -1323,3 +1323,257 @@ main.container {
     margin-right: 0;
   }
 }
+
+/* ============================================================
+   V1.1 新增：数据安全 / 备份提醒 / 导入预览
+   ============================================================ */
+
+/* ---------------- 小尺寸按钮（提示条内使用） ---------------- */
+
+.btn--sm {
+  min-height: 36px;
+  padding: 0 var(--sp-3);
+  font-size: var(--fs-xs);
+  gap: var(--sp-1);
+}
+
+/* ---------------- 数据安全卡片 ---------------- */
+
+.data-safety {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-3);
+}
+
+.data-safety .section-head h2 {
+  font-size: 1.125rem;
+}
+
+.data-safety__row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--sp-4);
+  flex-wrap: wrap;
+}
+
+.data-safety__info {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.data-safety__meta {
+  font-size: var(--fs-sm);
+  color: var(--text-primary);
+}
+
+.data-safety__sub {
+  font-size: var(--fs-xs);
+  color: var(--text-muted);
+}
+
+.data-safety__actions {
+  display: flex;
+  gap: var(--sp-2);
+  flex-wrap: wrap;
+}
+
+.data-safety__note {
+  font-size: var(--fs-xs);
+  color: var(--text-muted);
+  line-height: 1.7;
+  border-top: 1px solid var(--border);
+  padding-top: var(--sp-3);
+}
+
+/* ---------------- 备份提醒条 ---------------- */
+
+.backup-banner {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-3);
+  flex-wrap: wrap;
+  background: var(--accent-soft);
+  border: 1px solid rgba(245, 166, 35, 0.28);
+  border-radius: var(--radius-md);
+  padding: var(--sp-3) var(--sp-4);
+}
+
+.backup-banner__icon {
+  display: inline-flex;
+  color: var(--accent);
+  flex: none;
+}
+
+.backup-banner__text {
+  flex: 1 1 200px;
+  min-width: 0;
+  font-size: var(--fs-sm);
+  color: var(--text-secondary);
+}
+
+.backup-banner__actions {
+  display: flex;
+  gap: var(--sp-2);
+  flex-wrap: wrap;
+}
+
+/* ---------------- 导入预览对话框 ---------------- */
+
+.modal--wide {
+  max-width: 560px;
+}
+
+.modal--wide .modal__body {
+  max-height: min(80vh, 640px);
+  overflow-y: auto;
+}
+
+.preview-meta {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-1);
+  background: var(--bg-input);
+  border-radius: var(--radius-md);
+  padding: var(--sp-3);
+}
+
+.preview-meta__row {
+  display: flex;
+  gap: var(--sp-3);
+  font-size: var(--fs-xs);
+}
+
+.preview-meta__key {
+  flex: none;
+  width: 5em;
+  color: var(--text-muted);
+}
+
+.preview-meta__val {
+  color: var(--text-secondary);
+  min-width: 0;
+  word-break: break-all;
+}
+
+.preview-section {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-2);
+}
+
+.preview-section__title {
+  font-size: var(--fs-sm);
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+.preview-list,
+.preview-warn {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-1);
+}
+
+.preview-item {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-2);
+  font-size: var(--fs-sm);
+  color: var(--text-secondary);
+}
+
+.preview-item__badge {
+  flex: none;
+  font-size: 0.6875rem;
+  padding: 1px 6px;
+  border-radius: var(--radius-pill);
+  border: 1px solid transparent;
+}
+
+.preview-item__badge--add {
+  color: var(--success);
+  background: var(--success-soft);
+  border-color: rgba(34, 197, 94, 0.3);
+}
+
+.preview-item__badge--overwrite {
+  color: var(--accent);
+  background: var(--accent-soft);
+  border-color: rgba(245, 166, 35, 0.3);
+}
+
+.preview-item__detail {
+  font-size: var(--fs-xs);
+  color: var(--text-muted);
+}
+
+.preview-warn li {
+  position: relative;
+  padding-left: var(--sp-3);
+  font-size: var(--fs-xs);
+  color: var(--text-secondary);
+  line-height: 1.6;
+}
+
+.preview-warn li::before {
+  content: '·';
+  position: absolute;
+  left: var(--sp-1);
+  color: var(--accent);
+}
+
+.preview-note {
+  font-size: var(--fs-xs);
+  color: var(--text-muted);
+  line-height: 1.7;
+}
+
+/* ---------------- 响应式：数据安全区 ---------------- */
+
+@media (max-width: 639px) {
+  .data-safety__row {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .data-safety__actions {
+    width: 100%;
+  }
+
+  .data-safety__actions .btn {
+    flex: 1 1 auto;
+    justify-content: center;
+  }
+
+  .backup-banner {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: var(--sp-2);
+  }
+
+  .backup-banner__text {
+    flex: none;
+  }
+
+  .modal--wide .modal__body {
+    max-height: 85vh;
+    padding: var(--sp-4);
+  }
+}
+
+@media (max-width: 400px) {
+  .backup-banner__actions {
+    width: 100%;
+  }
+
+  .backup-banner__actions .btn {
+    flex: 1 1 auto;
+    justify-content: center;
+  }
+}

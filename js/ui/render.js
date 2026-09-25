@@ -20,6 +20,8 @@ import {
 } from './components.js';
 import {
   formatDate,
+  formatDateTime,
+  formatDaysAgo,
   formatMoney,
   formatInt,
   formatPercent,
@@ -669,4 +671,106 @@ export function renderSettingsSection(container, ctx, ui) {
   container.replaceChildren(
     h('section', { class: 'card drawer', 'aria-label': '设置与偏好' }, [toggleBtn, body]),
   );
+}
+
+/* ---------------- 数据安全模块（V1.1 新增：G4 备份提醒 / G5 数据安全区） ---------------- */
+
+/**
+ * 数据安全卡片：显示当前数据量与最后备份时间，并提供导出/导入入口；
+ * 满足提醒条件时在卡内附一条温和的备份提示条。
+ * @param {HTMLElement} container
+ * @param {object} ctx 需含 ctx.backupStatus 与 ctx.actions.{exportData,importData,snoozeBackup}
+ */
+export function renderDataSection(container, ctx) {
+  const status = ctx.backupStatus || {
+    itemCount: 0,
+    lastExportAt: null,
+    daysSinceExport: null,
+    shouldRemind: false,
+    message: '',
+  };
+
+  const metaText =
+    status.itemCount === 0
+      ? '暂无数据 —— 填写生命倒计时或存款参数后，这里会显示备份状态'
+      : `当前数据 ${status.itemCount} 项 · 最后备份 ${formatDaysAgo(status.daysSinceExport, '从未备份')}`;
+
+  const exportBtn = h(
+    'button',
+    {
+      type: 'button',
+      class: 'btn btn--primary',
+      onclick: () => ctx.actions.exportData(),
+    },
+    [icon('export', 16), h('span', { text: '导出备份' })],
+  );
+
+  const importBtn = h(
+    'button',
+    {
+      type: 'button',
+      class: 'btn btn--ghost',
+      onclick: () => ctx.actions.importData(),
+    },
+    [icon('import', 16), h('span', { text: '导入备份' })],
+  );
+
+  const parts = [
+    h('div', { class: 'section-head' }, [icon('shield', 18), h('h2', { text: '数据安全' })]),
+    h('div', { class: 'data-safety__row' }, [
+      h('div', { class: 'data-safety__info' }, [
+        h('p', { class: 'data-safety__meta', text: metaText }),
+        status.lastExportAt
+          ? h('p', {
+              class: 'data-safety__sub',
+              text: `上次导出：${formatDateTime(status.lastExportAt)}`,
+            })
+          : null,
+      ]),
+      h('div', { class: 'data-safety__actions' }, [exportBtn, importBtn]),
+    ]),
+    h('p', {
+      class: 'data-safety__note',
+      text:
+        '所有数据只存在这台设备的浏览器里，没有任何服务器副本。' +
+        '清理浏览器数据、更换设备或重装系统都会导致数据丢失 —— 导出备份是唯一的保护手段。',
+    }),
+  ];
+
+  if (status.shouldRemind) {
+    parts.push(
+      h('div', { class: 'backup-banner', role: 'status' }, [
+        h('span', { class: 'backup-banner__icon' }, [icon('alert', 18)]),
+        h('span', {
+          class: 'backup-banner__text',
+          text: status.message || '建议导出一份新的备份。',
+        }),
+        h('div', { class: 'backup-banner__actions' }, [
+          h(
+            'button',
+            {
+              type: 'button',
+              class: 'btn btn--primary btn--sm',
+              onclick: () => ctx.actions.exportData(),
+            },
+            [h('span', { text: '立即导出' })],
+          ),
+          h(
+            'button',
+            {
+              type: 'button',
+              class: 'btn btn--ghost btn--sm',
+              onclick: () => ctx.actions.snoozeBackup(),
+            },
+            [h('span', { text: '稍后再说' })],
+          ),
+        ]),
+      ]),
+    );
+  }
+
+  container.replaceChildren(
+    h('section', { class: 'card data-safety', 'aria-label': '数据安全与备份' }, parts),
+  );
+  return null;
 }

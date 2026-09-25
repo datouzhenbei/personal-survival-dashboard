@@ -66,3 +66,25 @@ export function formatMonthsLeft(months, capMonths = 1200) {
   }
   return { text: formatInt(months), tone: 'accent' };
 }
+
+/**
+ * 日期时间：YYYY-MM-DD HH:mm（备份导出时间展示用）
+ * @param {Date|string|number|null|undefined} input
+ */
+export function formatDateTime(input) {
+  if (!input) return '—';
+  const d = input instanceof Date ? input : new Date(input);
+  if (isNaN(d.getTime())) return '—';
+  return `${formatDate(d)} ${pad2(d.getHours())}:${pad2(d.getMinutes())}`;
+}
+
+/**
+ * 「距今多少天」文案
+ * @param {number|null} days
+ * @param {string} [fallback='从未']
+ */
+export function formatDaysAgo(days, fallback = '从未') {
+  if (days === null || days === undefined || !isFinite(days)) return fallback;
+  if (days <= 0) return '今天';
+  return `${days} 天前`;
+}

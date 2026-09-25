@@ -5,7 +5,7 @@
  *   2. 调用 core（LifeCountdown / SavingsCalculator）取得计算结果
  *   3. 调用 render.js 渲染各模块
  *   4. setInterval 每秒仅刷新倒计时文本节点（不重读 localStorage、不整卡重绘）
- *   5. 编排输入失焦存盘、导入/导出/清空/重置、自定义确认框与 Toast
+ *   5. 编排输入失焦存盘、导入（预览确认）/导出（时间戳文件名）/清空/重置、自定义确认框与 Toast
  * 本文件不含任何展示样式与组件结构，也不重复 core 的计算逻辑。
  */
 import { Config, Storage, LifeCountdown, SavingsCalculator } from '../core/index.js';
@@ -14,11 +14,11 @@ import {
   renderLifeSection,
   renderSavingsSection,
   renderSettingsSection,
+  renderDataSection,
 } from './render.js';
-import { confirmDialog, showToast } from './components.js';
-import { formatDate } from './format.js';
+import { confirmDialog, previewDialog, showToast } from './components.js';
 
-const APP_VERSION = 'v1.0.0';
+const APP_VERSION = Config.APP_VERSION;
 
 /* ---------------- DOM 锚点 ---------------- */
 
@@ -27,6 +27,7 @@ const lifeEl = document.getElementById('life-module');
 const savingsEl = document.getElementById('savings-module');
 const settingsEl = document.getElementById('settings-module');
 const statusEl = document.getElementById('save-status');
+const dataEl = document.getElementById('data-module');
 const importInput = document.getElementById('import-file');
 
 /* ---------------- 应用状态 ---------------- */
@@ -137,6 +138,8 @@ function buildCtx() {
     savingsError,
     symbol: state.settings.currencySymbol || Config.DEFAULTS.currencySymbol,
     cfgVals: savingsDisplayVals,
+    // 备份状态：数据安全卡与提醒条据此渲染（V1.1）
+    backupStatus: Storage.backupStatus(),
     actions: {
       onProfileCommit: handleProfileCommit,
       onSavingsCommit: handleSavingsCommit,
@@ -144,6 +147,7 @@ function buildCtx() {
       resetSettings: handleResetSettings,
       exportData: exportData,
       importData: () => importInput.click(),
+      snoozeBackup: snoozeBackup,
     },
   };
 }
@@ -157,6 +161,7 @@ function fullRender(focusHint = null) {
   const upHero = renderHero(heroEl, ctx);
   const upLife = renderLifeSection(lifeEl, ctx);
   renderSavingsSection(savingsEl, ctx);
+  renderDataSection(dataEl, ctx);
   renderSettingsSection(settingsEl, ctx);
   if (upHero) tickUpdaters.push(upHero);
   if (upLife) tickUpdaters.push(upLife);
@@ -237,6 +242,7 @@ function handleProfileCommit(values, sourceField, focusHint) {
     return { field: sourceField === 'lifeExpectancy' ? 'lifeExpectancy' : 'birthDate', message: friendlyError(e) };
   }
   Storage.save(Config.KEYS.PROFILE, next);
+  Storage.markChanged();
   fullRender(focusHint);
   return null;
 }
@@ -292,6 +298,7 @@ function handleSavingsCommit(raw, focusHint) {
     return { field: 'savings', message: friendlyError(e) };
   }
   Storage.save(Config.KEYS.SAVINGS, next);
+  Storage.markChanged();
   fullRender(focusHint);
   return null;
 }
@@ -318,6 +325,7 @@ function handleSettingsCommit(raw, focusHint) {
   const next = { ...(state.settings || defaultSettings()), currencySymbol: symbol, inflationRate, theme: 'dark' };
   if (shallowEqual(next, state.settings || {})) return null;
   Storage.save(Config.KEYS.SETTINGS, next);
+  Storage.markChanged();
   fullRender(focusHint);
   return null;
 }
@@ -331,6 +339,7 @@ async function handleResetSettings() {
   });
   if (!ok) return;
   Storage.save(Config.KEYS.SETTINGS, defaultSettings());
+  Storage.markChanged();
   fullRender();
   showToast('偏好已重置为默认', 'success');
 }
@@ -355,35 +364,81 @@ function shallowEqual(a, b) {
 
 function exportData() {
   try {
+    if (Storage.countItems() === 0) {
+      showToast('还没有可备份的数据', 'info');
+      return;
+    }
     const json = Storage.exportJSON();
+    const fileName = Storage.exportFileName();
     const blob = new Blob([json], { type: 'application/json' });
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
-    a.download = `personal-survival-dashboard-${formatDate(new Date()).replace(/-/g, '')}.json`;
+    a.download = fileName;
     document.body.appendChild(a);
     a.click();
     a.remove();
     setTimeout(() => URL.revokeObjectURL(url), 1000);
-    showToast('已导出 JSON 备份', 'success');
+    // 记录本次导出时间 —— 备份提醒据此判断是否已备份
+    Storage.markExported();
+    fullRender();
+    showToast(`已导出备份 ${fileName}`, 'success');
   } catch (e) {
     console.error(e);
     showToast('导出失败', 'error');
   }
 }
 
+/** 备份提醒「稍后再说」：静默 24 小时后不再提示 */
+function snoozeBackup() {
+  Storage.snoozeBackupReminder();
+  fullRender();
+  showToast('已推迟提醒', 'info');
+}
+
+/**
+ * 导入流程（G2 必校验 + G3 预览确认）：
+ *   读取 → 解析校验（此步绝不写数据）→ 预览确认 → 白名单写入 → 刷新
+ */
 function importDataFromFile(file) {
   const reader = new FileReader();
-  reader.onload = () => {
-    const ok = Storage.importAll(String(reader.result || ''));
-    if (ok) {
-      fullRender();
-      showToast('导入成功，数据已恢复', 'success');
-    } else {
-      showToast('导入失败：文件格式不正确', 'error');
-    }
-  };
   reader.onerror = () => showToast('导入失败：无法读取文件', 'error');
+  reader.onload = async () => {
+    const parsed = Storage.parseImport(String(reader.result || ''));
+
+    if (!parsed.ok) {
+      showToast(`导入失败：${(parsed.errors && parsed.errors[0]) || '文件格式不正确'}`, 'error');
+      return;
+    }
+
+    // 判断每一项是「新增」还是「覆盖」
+    const items = Object.keys(parsed.data).map((name) => ({
+      name,
+      action: Storage.load(Config.KEYS[name], null) === null ? 'add' : 'overwrite',
+    }));
+
+    const confirmed = await previewDialog({
+      fileName: file.name,
+      meta: parsed.meta,
+      items,
+      warnings: parsed.warnings,
+      ignoredFields: parsed.ignoredFields,
+    });
+    if (!confirmed) {
+      showToast('已取消导入', 'info');
+      return;
+    }
+
+    const res = Storage.applyImport(parsed.data);
+    if (!res.ok) {
+      showToast(`导入失败：${res.error || '写入出错，已保持原数据'}`, 'error');
+      return;
+    }
+
+    Storage.markChanged();
+    fullRender();
+    showToast(`导入成功，已写入 ${res.written.length} 项数据`, 'success');
+  };
   reader.readAsText(file);
 }
 
@@ -396,6 +451,7 @@ async function clearAllData() {
   });
   if (!ok) return;
   Storage.clearAll();
+  Storage.markChanged();
   fullRender();
   showToast('全部数据已清空', 'success');
 }

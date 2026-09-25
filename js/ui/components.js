@@ -4,6 +4,7 @@
  *       ConfirmDialog / Toast，以及 h()/svg() DOM 构造助手与内联 SVG 图标。
  * 所有组件返回真实 DOM 节点，不依赖任何框架。
  */
+import { formatDateTime } from './format.js';
 
 const SVG_NS = 'http://www.w3.org/2000/svg';
 
@@ -88,6 +89,13 @@ const ICON_PATHS = {
     '<path d="M3 7a2 2 0 0 1 2-2h13a1 1 0 0 1 1 1v2"/>' +
     '<rect x="3" y="6" width="18" height="14" rx="2"/>' +
     '<path d="M16 13h3v3h-3a1.5 1.5 0 0 1 0-3z"/>',
+  // 盾牌（数据安全卡）
+  shield: '<path d="M12 22s8-3.9 8-10V5.5L12 3 4 5.5V12c0 6.1 8 10 8 10z"/>',
+  // 警示三角（备份提醒条）
+  alert:
+    '<path d="M12 4.4 2.9 20h18.2L12 4.4z"/>' +
+    '<line x1="12" y1="10" x2="12" y2="14.4"/>' +
+    '<line x1="12" y1="17.2" x2="12" y2="17.3"/>',
 };
 
 /**
@@ -476,4 +484,155 @@ export function showToast(message, type = 'info') {
     toast.classList.remove('is-shown');
     setTimeout(() => toast.remove(), 300);
   }, 3000);
+}
+
+/* ---------------- PreviewDialog：导入前预览（G3） ---------------- */
+
+/** 数据项中文名（与 Config.DATA_FIELD_NAMES 对应） */
+const FIELD_LABELS = {
+  PROFILE: '个人档案',
+  LIFE: '生命预期自定义值',
+  SAVINGS: '存款与收支参数',
+  SETTINGS: '偏好设置',
+};
+
+function schemaLabel(meta) {
+  if (!meta) return '未记录';
+  const f = meta.formatVersion;
+  if (f === null || f === undefined) return '未记录';
+  const s = meta.schemaVersion;
+  return `v${f}（schema v${s === null || s === undefined ? '?' : s}）`;
+}
+
+/**
+ * 导入预览对话框：展示将写入 / 覆盖的内容，用户确认后才落库
+ * @param {object} opts
+ * @param {string} opts.fileName 源文件名
+ * @param {object|null} opts.meta { appVersion, schemaVersion, exportedAt, formatVersion }
+ * @param {Array<{name:string, action:'add'|'overwrite', detail?:string}>} opts.items
+ * @param {string[]} [opts.warnings] 校验提示
+ * @param {string[]} [opts.ignoredFields] 被忽略的未知字段
+ * @returns {Promise<boolean>} 用户是否确认导入
+ */
+export function previewDialog(opts) {
+  return new Promise((resolve) => {
+    let done = false;
+    const previousFocus = document.activeElement;
+
+    const cancelBtn = h('button', { type: 'button', class: 'btn btn--ghost', text: '取消' });
+    const confirmBtn = h('button', { type: 'button', class: 'btn btn--primary', text: '确认导入' });
+
+    const metaRows = [
+      ['文件名', opts.fileName || '—'],
+      ['导出时间', opts.meta && opts.meta.exportedAt ? formatDateTime(opts.meta.exportedAt) : '未记录'],
+      ['应用版本', (opts.meta && opts.meta.appVersion) || '未记录'],
+      ['格式版本', schemaLabel(opts.meta)],
+    ];
+
+    const items = opts.items || [];
+    const warnings = opts.warnings || [];
+    const ignored = opts.ignoredFields || [];
+
+    const children = [
+      h('h3', { class: 'modal__title', id: 'preview-title', text: '导入备份预览' }),
+      h(
+        'div',
+        { class: 'preview-meta' },
+        metaRows.map(([k, v]) =>
+          h('div', { class: 'preview-meta__row' }, [
+            h('span', { class: 'preview-meta__key', text: k }),
+            h('span', { class: 'preview-meta__val', text: String(v) }),
+          ]),
+        ),
+      ),
+      h('div', { class: 'preview-section' }, [
+        h('h4', { class: 'preview-section__title', text: `将写入 ${items.length} 项数据` }),
+        h(
+          'ul',
+          { class: 'preview-list' },
+          items.map((it) =>
+            h('li', { class: 'preview-item' }, [
+              h('span', {
+                class: `preview-item__badge preview-item__badge--${it.action}`,
+                text: it.action === 'overwrite' ? '覆盖' : '新增',
+              }),
+              h('span', {
+                class: 'preview-item__name',
+                text: it.label || FIELD_LABELS[it.name] || it.name,
+              }),
+              it.detail ? h('span', { class: 'preview-item__detail', text: it.detail }) : null,
+            ]),
+          ),
+        ),
+      ]),
+    ];
+
+    if (warnings.length) {
+      children.push(
+        h('div', { class: 'preview-section' }, [
+          h('h4', { class: 'preview-section__title', text: `校验提示（${warnings.length}）` }),
+          h('ul', { class: 'preview-warn' }, warnings.map((w) => h('li', { text: w }))),
+        ]),
+      );
+    }
+
+    if (ignored.length) {
+      children.push(
+        h('p', { class: 'preview-note', text: `已忽略无法识别的字段：${ignored.join('、')}` }),
+      );
+    }
+
+    children.push(
+      h('p', {
+        class: 'preview-note',
+        text:
+          '导入为「覆盖式」：备份里有的数据项会被写入，备份里没有的保持不变。' +
+          '该文件含你的个人参数，仅保存在本机，请妥善保管。',
+      }),
+      h('div', { class: 'modal__actions' }, [cancelBtn, confirmBtn]),
+    );
+
+    const dialog = h(
+      'div',
+      {
+        class: 'modal modal--wide',
+        role: 'dialog',
+        'aria-modal': 'true',
+        'aria-labelledby': 'preview-title',
+      },
+      [h('div', { class: 'modal__body' }, children)],
+    );
+
+    const overlay = h('div', { class: 'modal-overlay' }, [dialog]);
+    document.getElementById('modal-root').appendChild(overlay);
+
+    function close(result) {
+      if (done) return;
+      done = true;
+      document.removeEventListener('keydown', onKeydown, true);
+      overlay.remove();
+      if (previousFocus && typeof previousFocus.focus === 'function') {
+        try {
+          previousFocus.focus({ preventScroll: true });
+        } catch {
+          previousFocus.focus();
+        }
+      }
+      resolve(result);
+    }
+    function onKeydown(e) {
+      if (e.key === 'Escape') {
+        e.stopPropagation();
+        close(false);
+      }
+    }
+
+    cancelBtn.addEventListener('click', () => close(false));
+    confirmBtn.addEventListener('click', () => close(true));
+    overlay.addEventListener('mousedown', (e) => {
+      if (e.target === overlay) close(false);
+    });
+    document.addEventListener('keydown', onKeydown, true);
+    confirmBtn.focus();
+  });
 }
