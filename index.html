@@ -5,7 +5,26 @@
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
   <meta name="description" content="人生余额：算算你还能活多久、钱还能撑多久。全部在本机计算，数据不上传服务器。">
   <meta name="color-scheme" content="dark">
+  <meta name="theme-color" content="#0a0a0c">
   <title>人生余额 · 我还能活多久，钱还能撑多久</title>
+
+  <!-- 社交分享卡片（微信 / QQ / X / Facebook 等抓取 og:* 生成链接预览卡）
+       注意：og:image 必须是绝对地址，聊天工具才能抓到图。 -->
+  <meta property="og:type" content="website">
+  <meta property="og:site_name" content="人生余额">
+  <meta property="og:title" content="人生余额 · 我还能活多久，钱还能撑多久">
+  <meta property="og:description" content="填一个出生日期，看看还剩多少天；填一笔存款，看看还能撑多久。全部在本机计算，数据不上传。">
+  <meta property="og:url" content="https://datouzhenbei.github.io/personal-survival-dashboard/">
+  <meta property="og:image" content="https://datouzhenbei.github.io/personal-survival-dashboard/assets/og-cover.png">
+  <meta property="og:image:type" content="image/png">
+  <meta property="og:image:width" content="1200">
+  <meta property="og:image:height" content="630">
+  <meta property="og:image:alt" content="人生余额：我还能活多久 · 钱还能撑多久">
+  <meta property="og:locale" content="zh_CN">
+  <meta name="twitter:card" content="summary_large_image">
+  <meta name="twitter:title" content="人生余额 · 我还能活多久，钱还能撑多久">
+  <meta name="twitter:description" content="填一个出生日期，看看还剩多少天；填一笔存款，看看还能撑多久。全部在本机计算。">
+  <meta name="twitter:image" content="https://datouzhenbei.github.io/personal-survival-dashboard/assets/og-cover.png">
   <!-- 内联 favicon（data URI），避免产生额外网络请求 -->
   <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Ccircle cx='12' cy='12' r='10' fill='%23f5a623'/%3E%3C/svg%3E">
   <link rel="stylesheet" href="./css/style.css">
@@ -52,29 +71,31 @@
     </div>
   </header>
 
+  <!-- main 在宽屏下同时充当「整页统一栅格」：hero / 生命 / 存款三个 section 用
+       display:contents 让各自的卡片直接落进同一套两列网格，保证左右边界严格对齐。 -->
   <main class="container">
-    <!-- 首屏总览：剩余生命天数 · 存款可支撑月数（JS 渲染） -->
+    <!-- 首屏两张卡：我还能活多久 / 钱还能撑多久（JS 渲染） -->
     <section id="hero" class="hero-grid" aria-label="核心数据总览"></section>
 
-    <!-- 生命倒计时模块（JS 渲染） -->
+    <!-- 生命模块：进度环 + 参数（JS 渲染，一个 section 只出一张卡） -->
     <section id="life-module" class="module" aria-label="生命倒计时"></section>
 
-    <!-- 存款生存计算器模块（JS 渲染） -->
+    <!-- 存款模块：参数卡 + 明细条（JS 渲染） -->
     <section id="savings-module" class="module" aria-label="存款生存计算器"></section>
 
-    <!-- 数据安全与备份模块（JS 渲染，V1.1 新增） -->
-    <section id="data-module" class="module" aria-label="数据安全与备份"></section>
+    <!-- 备份提醒：只在需要提醒时才有内容，平时整块隐藏（JS 渲染） -->
+    <section id="data-module" class="module" aria-label="备份提醒" hidden></section>
 
-    <!-- 设置抽屉（JS 渲染） -->
+    <!-- 设置抽屉（含数据安全与备份，JS 渲染） -->
     <section id="settings-module" aria-label="设置与偏好"></section>
   </main>
 
-  <!-- 页脚：免责声明全文由 JS 从 Config.DISCLAIMER 填充 -->
+  <!-- 页脚：压成两行（免责声明全文由 JS 从 Config.DISCLAIMER 填充） -->
   <footer class="site-footer">
     <div class="container">
       <p id="footer-disclaimer"></p>
-      <p>所有数据仅保存在本设备的浏览器 localStorage 中，清除浏览器数据将丢失。</p>
       <div class="footer-meta">
+        <span>数据只在本机，清浏览器数据会丢</span>
         <span id="app-version"></span>
         <a href="https://github.com/datouzhenbei/personal-survival-dashboard" id="repo-link" class="footer-link" target="_blank" rel="noopener noreferrer">GitHub 仓库</a>
       </div>

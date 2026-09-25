@@ -10,7 +10,8 @@
   --bg-base: #0a0a0c;
   --bg-card: #141417;
   --bg-card-hover: #1c1c20;
-  --bg-input: #1a1a1e;
+  /* 输入框底色比卡片略亮一点：早先两者几乎同色，实机上看不出哪里能输入 */
+  --bg-input: #1f1f25;
   --border: #26262b;
   --border-strong: #34343a;
   --text-primary: #f5f5f6;
@@ -35,6 +36,7 @@
   --sp-2: 8px;
   --sp-3: 12px;
   --sp-4: 16px;
+  --sp-5: 20px;
   --sp-6: 24px;
   --sp-8: 32px;
 
@@ -42,6 +44,11 @@
   --radius-md: 12px;
   --radius-lg: 16px;
   --radius-pill: 999px;
+
+  /* V1.3.0 紧凑节奏：全站间距与内边距都从这套值出，
+     目的只有一个 —— 整页在 1440x800 的视口里不用滚动就能看完。 */
+  --card-pad: 16px;
+  --gap-grid: 12px;
 
   --shadow-card: 0 1px 0 rgba(255, 255, 255, 0.03), 0 8px 24px rgba(0, 0, 0, 0.3);
 
@@ -66,7 +73,7 @@ body {
   margin: 0;
   font-family: var(--font-sans);
   font-size: var(--fs-body);
-  line-height: 1.6;
+  line-height: 1.5;
   color: var(--text-primary);
   background: var(--bg-base);
   -webkit-font-smoothing: antialiased;
@@ -112,21 +119,22 @@ a:hover {
 
 main.container {
   flex: 1;
-  padding-top: var(--sp-6);
-  padding-bottom: var(--sp-8);
+  padding-top: var(--gap-grid);
+  padding-bottom: var(--gap-grid);
   display: flex;
   flex-direction: column;
-  gap: var(--sp-8);
+  gap: var(--gap-grid);
 }
 
 /* 数字等宽，避免跳动 */
 .stat-card__value,
 .stat-card__unit,
-.result-hero__value,
-.data-table td.num,
-.total-item__value,
-.burn-result__value,
-.ring-center__pct {
+.hl-strip__main,
+.hl-strip__clock,
+.elapsed-line__val,
+.detail-bar__value,
+.ring-center__pct,
+.data-table td.num {
   font-variant-numeric: tabular-nums;
 }
 
@@ -146,13 +154,13 @@ main.container {
   align-items: center;
   justify-content: space-between;
   gap: var(--sp-4);
-  min-height: 64px;
-  padding-top: var(--sp-3);
-  padding-bottom: var(--sp-3);
+  min-height: 56px;
+  padding-top: var(--sp-2);
+  padding-bottom: var(--sp-2);
 }
 
 .brand h1 {
-  font-size: var(--fs-h2);
+  font-size: 1.25rem;
   font-weight: 650;
   letter-spacing: 0.02em;
   white-space: nowrap;
@@ -197,8 +205,8 @@ main.container {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  width: 44px;
-  height: 44px;
+  width: 40px;
+  height: 40px;
   border-radius: var(--radius-sm);
   color: var(--text-secondary);
   border: 1px solid transparent;
@@ -227,15 +235,26 @@ main.container {
   border: 1px solid var(--border);
   border-radius: var(--radius-lg);
   box-shadow: var(--shadow-card);
-  padding: var(--sp-6);
+  padding: var(--card-pad);
 }
 
 .card__title {
-  font-size: var(--fs-body);
+  font-size: var(--fs-sm);
   font-weight: 600;
   color: var(--text-secondary);
-  margin-bottom: var(--sp-4);
+  margin-bottom: var(--sp-3);
   letter-spacing: 0.02em;
+}
+
+/* 卡片级小字说明（替代逐字段 hint，省一行高度） */
+.card__note {
+  font-size: var(--fs-xs);
+  color: var(--text-muted);
+  line-height: 1.5;
+}
+
+.card__note--error {
+  color: var(--danger);
 }
 
 .card__error {
@@ -302,14 +321,14 @@ main.container {
 
 .hero-grid {
   display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: var(--sp-4);
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--gap-grid);
 }
 
 .stat-card {
   display: flex;
   flex-direction: column;
-  gap: var(--sp-3);
+  gap: var(--sp-2);
   transition: border-color 0.2s ease, background 0.2s ease;
 }
 
@@ -363,7 +382,7 @@ main.container {
 }
 
 .stat-card__value {
-  font-size: clamp(2rem, 12vw, var(--fs-hero));
+  font-size: clamp(1.75rem, 7.2vw, 3rem);
   font-weight: 650;
   line-height: 1.1;
   letter-spacing: -0.02em;
@@ -416,7 +435,7 @@ main.container {
   justify-content: space-between;
   gap: var(--sp-2) var(--sp-3);
   flex-wrap: wrap;
-  padding: 12px 14px;
+  padding: 10px 12px;
   border-radius: var(--radius-md);
   background: var(--accent-soft);
   border: 1px solid rgba(245, 166, 35, 0.26);
@@ -546,26 +565,14 @@ main.container {
 
 /* ---------------- 模块通用 ---------------- */
 
+/* 每个模块现在最多两张元素：一张卡 +（存款模块的）明细条。
+   独立标题行（原「生命倒计时 / 存款生存计算器」）已在 V1.3.0 删除，
+   标题改由卡片自己的 .card__title 承担。 */
 .module {
   display: flex;
   flex-direction: column;
-  gap: var(--sp-4);
-}
-
-.section-head {
-  display: flex;
-  align-items: center;
-  gap: var(--sp-2);
-}
-
-.section-head svg {
-  color: var(--accent);
-}
-
-.section-head h2 {
-  font-size: var(--fs-h2);
-  font-weight: 600;
-  letter-spacing: 0.01em;
+  gap: var(--sp-3);
+  min-width: 0;
 }
 
 /* ---------------- 表单 ---------------- */
@@ -678,15 +685,20 @@ main.container {
   flex-wrap: wrap;
 }
 
+/* chip 三个尺寸走自定义属性：便于「半栏卡片」这类局部场景整体收小。
+   ⚠️ 这里必须用「逐属性」过渡，不能写 transition: all ——
+   否则 min-height / padding / font-size 也会参与过渡，
+   跨越 1024px 断点时 chip 会「跳一下」，而且无头浏览器里
+   过渡未跑完时读到的计算值全是旧值（曾据此误判为选择器失效）。 */
 .chip {
-  min-height: 44px;
-  padding: 0 var(--sp-4);
+  min-height: var(--chip-h, 44px);
+  padding: 0 var(--chip-pad-x, var(--sp-4));
   border-radius: var(--radius-pill);
   border: 1px solid var(--border-strong);
   background: var(--bg-input);
   color: var(--text-secondary);
-  font-size: var(--fs-sm);
-  transition: all 0.15s ease;
+  font-size: var(--chip-fs, var(--fs-sm));
+  transition: background 0.15s ease, border-color 0.15s ease, color 0.15s ease;
 }
 
 .chip:hover {
@@ -701,27 +713,45 @@ main.container {
   font-weight: 600;
 }
 
-/* ---------------- 生命模块布局 ---------------- */
+/* ---------------- 生命模块（V1.3.0：进度环 + 参数合并为一张卡） ---------------- */
 
-.life-grid {
-  display: grid;
-  grid-template-columns: minmax(260px, 360px) 1fr;
-  gap: var(--sp-4);
-  align-items: start;
-}
-
-.life-side {
+.life-card {
   display: flex;
   flex-direction: column;
-  gap: var(--sp-4);
   min-width: 0;
 }
 
-.ring-card {
+.life-card__body {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  gap: var(--sp-3) var(--sp-5);
+  align-items: center;
+  flex: 1;
+}
+
+.life-card__ring {
+  display: flex;
+  justify-content: center;
+  flex: none;
+}
+
+/* 环从 220px 收到 132px：让整张卡能进一屏，也让它回归「进度指示」而不是主角；
+   省下的宽度留给右侧参数，保证「出生日期 | 性别」两栏不折行 */
+.life-card__ring .ring-wrap,
+.life-card__ring .ring-placeholder {
+  width: 132px;
+  height: 132px;
+}
+
+.life-card__ring .ring-center__pct {
+  font-size: 1.5rem;
+}
+
+.life-card__params {
   display: flex;
   flex-direction: column;
-  align-items: center;
-  gap: var(--sp-4);
+  gap: var(--sp-3);
+  min-width: 0;
 }
 
 .ring-wrap {
@@ -778,16 +808,6 @@ main.container {
   letter-spacing: 0.15em;
 }
 
-.ring-card__note {
-  font-size: var(--fs-xs);
-  color: var(--text-muted);
-  text-align: center;
-}
-
-.ring-card__note.is-over {
-  color: var(--success);
-}
-
 .ring-placeholder {
   width: 220px;
   height: 220px;
@@ -833,15 +853,6 @@ main.container {
   margin-top: var(--sp-2);
 }
 
-.inline-banner {
-  font-size: var(--fs-sm);
-  color: var(--text-secondary);
-  background: var(--accent-soft);
-  border: 1px solid rgba(245, 166, 35, 0.25);
-  border-radius: var(--radius-md);
-  padding: var(--sp-3) var(--sp-4);
-}
-
 .empty {
   display: flex;
   flex-direction: column;
@@ -874,115 +885,27 @@ main.container {
   max-width: 32em;
 }
 
-/* ---------------- 存款模块 ---------------- */
+/* ---------------- 存款明细条（V1.3.0：横跨两列的一排小格） ----------------
+   可支撑月数 / 耗尽日期的结论在首屏卡 B 上，这里只放「明细 + 压力测试」，
+   整页不会出现两处一样的数字，也省下大半屏高度。 */
 
-.savings-grid {
+.detail-bar {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-3);
+  min-width: 0;
+}
+
+.detail-bar__grid {
   display: grid;
-  grid-template-columns: minmax(0, 420px) 1fr;
-  gap: var(--sp-4);
-  align-items: start;
-}
-
-.savings-grid .form-grid {
-  grid-template-columns: 1fr;
-}
-
-.result-card {
-  display: flex;
-  flex-direction: column;
-}
-
-.result-panel {
-  display: flex;
-  flex-direction: column;
-  gap: var(--sp-6);
-}
-
-.result-hero {
-  display: flex;
-  align-items: baseline;
-  gap: var(--sp-2);
-  flex-wrap: wrap;
-}
-
-.result-hero__value {
-  font-size: clamp(2rem, 9vw, 3rem);
-  font-weight: 650;
-  line-height: 1.1;
-  letter-spacing: -0.02em;
-}
-
-.result-hero__unit {
-  font-size: var(--fs-h2);
-  color: var(--text-secondary);
-}
-
-.result-hero__sub {
-  font-size: var(--fs-sm);
-  color: var(--text-secondary);
-  margin-top: calc(-1 * var(--sp-3));
-}
-
-.tone-accent { color: var(--accent); }
-.tone-success { color: var(--success); }
-.tone-danger { color: var(--danger); }
-.tone-muted { color: var(--text-muted); }
-
-/* 月净消耗 */
-
-.burn-row {
-  display: flex;
-  flex-direction: column;
-  gap: var(--sp-3);
-  padding: var(--sp-4);
-  background: var(--bg-input);
-  border: 1px solid var(--border);
-  border-radius: var(--radius-md);
-}
-
-.burn-eq {
-  display: flex;
-  align-items: center;
-  gap: var(--sp-3);
-  flex-wrap: wrap;
-  font-size: var(--fs-sm);
-  color: var(--text-secondary);
-}
-
-.burn-eq__op {
-  color: var(--text-muted);
-}
-
-.burn-result {
-  display: flex;
-  align-items: baseline;
-  justify-content: space-between;
-  gap: var(--sp-3);
-  padding-top: var(--sp-3);
-  border-top: 1px dashed var(--border-strong);
-}
-
-.burn-result__label {
-  font-size: var(--fs-sm);
-}
-
-.burn-result__value {
-  font-size: var(--fs-h2);
-  font-weight: 650;
-}
-
-/* 汇总三栏 */
-
-.totals-grid {
-  display: grid;
-  grid-template-columns: repeat(3, 1fr);
+  grid-template-columns: repeat(4, minmax(0, 1fr)) minmax(0, 1.5fr);
   gap: var(--sp-3);
 }
 
-.total-item {
+.detail-bar__cell {
   display: flex;
   flex-direction: column;
-  gap: var(--sp-1);
+  gap: 2px;
   padding: var(--sp-3);
   background: var(--bg-input);
   border: 1px solid var(--border);
@@ -990,18 +913,34 @@ main.container {
   min-width: 0;
 }
 
-.total-item__label {
+.detail-bar__label {
   font-size: var(--fs-xs);
   color: var(--text-muted);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
-.total-item__value {
-  font-size: var(--fs-sm);
-  font-weight: 550;
+.detail-bar__value {
+  font-size: var(--fs-body);
+  font-weight: 650;
+  line-height: 1.3;
   overflow-wrap: anywhere;
 }
 
-.result-note {
+.detail-bar__sub {
+  font-size: var(--fs-xs);
+  color: var(--text-muted);
+  line-height: 1.4;
+  overflow-wrap: anywhere;
+}
+
+.detail-bar__hint {
+  font-size: var(--fs-sm);
+  color: var(--text-muted);
+}
+
+.detail-bar__note {
   font-size: var(--fs-xs);
   color: var(--success);
   background: var(--success-soft);
@@ -1009,19 +948,39 @@ main.container {
   padding: var(--sp-2) var(--sp-3);
 }
 
-/* 压力测试表 */
-
-.stress-wrap {
+/* 压力测试：三行「标签 —— 月数」，比原来的三行表格矮一半 */
+.stress-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
   display: flex;
   flex-direction: column;
-  gap: var(--sp-3);
+  gap: 1px;
+  font-size: var(--fs-xs);
+  color: var(--text-muted);
 }
 
-.stress-wrap__title {
-  font-size: var(--fs-sm);
-  color: var(--text-secondary);
-  font-weight: 600;
+.stress-list li {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--sp-2);
 }
+
+.stress-list b {
+  font-weight: 600;
+  color: var(--text-secondary);
+  white-space: nowrap;
+}
+
+/* ---------------- 语义色调 ---------------- */
+.tone-accent { color: var(--accent); }
+.tone-success { color: var(--success); }
+.tone-danger { color: var(--danger); }
+.tone-muted { color: var(--text-muted); }
+
+/* 月净消耗 / 汇总三栏 / 压力测试表 的旧样式已在 V1.3.0 删除
+   （对应结构合并进 .detail-bar，见上） */
 
 .data-table {
   width: 100%;
@@ -1129,6 +1088,36 @@ main.container {
   display: flex;
   flex-wrap: wrap;
   gap: var(--sp-2);
+  margin-top: var(--sp-4);
+}
+
+/* 数据安全与备份（V1.3.0：从页面上的独立整卡收进抽屉，
+   只在「超过 14 天没备份」时才会在页面流里单独出现一条提醒条） */
+
+.drawer__data {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  margin-top: var(--sp-4);
+  padding-top: var(--sp-3);
+  border-top: 1px solid var(--border);
+}
+
+.drawer__data-meta {
+  font-size: var(--fs-sm);
+  color: var(--text-primary);
+}
+
+.drawer__data-sub {
+  font-size: var(--fs-xs);
+  color: var(--text-muted);
+}
+
+.drawer__data-note {
+  font-size: var(--fs-xs);
+  color: var(--text-muted);
+  line-height: 1.7;
+  margin-top: var(--sp-2);
 }
 
 /* ---------------- 模态确认框 ---------------- */
@@ -1265,57 +1254,49 @@ main.container {
 
 .site-footer {
   border-top: 1px solid var(--border);
-  padding: var(--sp-6) 0;
-  margin-top: var(--sp-8);
+  padding: var(--sp-3) 0;
 }
 
 .site-footer .container {
   display: flex;
   flex-direction: column;
-  gap: var(--sp-2);
+  gap: 2px;
 }
 
 .site-footer p {
-  font-size: var(--fs-xs);
+  font-size: 0.6875rem;
   color: var(--text-muted);
-  line-height: 1.7;
+  line-height: 1.5;
 }
 
 .footer-meta {
   display: flex;
-  gap: var(--sp-4);
+  gap: var(--sp-3);
   flex-wrap: wrap;
-  padding-top: var(--sp-2);
+  font-size: 0.6875rem;
+  color: var(--text-muted);
 }
 
 .footer-link {
   color: var(--text-muted);
 }
 
-/* ---------------- 响应式：平板 ---------------- */
+/* ---------------- 响应式：平板（640-1023px） ----------------
+   1024px 以下没有「统一栅格」，各模块直接竖着堆，所以这里只要把
+   明细条从 5 列压到 3 列即可；生命卡保持「环 | 参数」左右并排。 */
 
 @media (max-width: 1023px) {
-  .life-grid,
-  .savings-grid {
-    grid-template-columns: 1fr;
-  }
-
-  .ring-card {
-    justify-self: center;
-    width: 100%;
-    max-width: 480px;
-  }
-
-  .savings-grid .form-grid {
-    grid-template-columns: repeat(2, 1fr);
+  .detail-bar__grid {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
   }
 }
 
-/* ---------------- 响应式：手机 ---------------- */
+/* ---------------- 响应式：手机（≤639px） ---------------- */
 
 @media (max-width: 639px) {
   :root {
     --fs-h2: 1.25rem;
+    --card-pad: 14px;
   }
 
   .container {
@@ -1324,16 +1305,13 @@ main.container {
   }
 
   main.container {
-    gap: var(--sp-6);
-    padding-top: var(--sp-4);
+    gap: var(--sp-3);
+    padding-top: var(--sp-3);
+    padding-bottom: var(--sp-4);
   }
 
   .brand p {
     display: none;
-  }
-
-  .save-status .save-status__text {
-    /* 状态文字保留但缩小空间 */
   }
 
   .save-status {
@@ -1344,8 +1322,10 @@ main.container {
     grid-template-columns: 1fr;
   }
 
-  .card {
-    padding: var(--sp-4);
+  /* 触屏：顶栏图标按钮回到 44px 最小点击尺寸（桌面为了压缩高度收到 40px） */
+  .icon-btn {
+    width: 44px;
+    height: 44px;
   }
 
   .form-grid,
@@ -1353,22 +1333,23 @@ main.container {
     grid-template-columns: 1fr;
   }
 
-  .savings-grid .form-grid {
+  /* 生命卡在手机上改成上下：环在上、参数在下，避免并排挤成两柱 */
+  .life-card__body {
     grid-template-columns: 1fr;
+    justify-items: center;
+    gap: var(--sp-4);
   }
 
-  .ring-wrap,
-  .ring-placeholder {
-    width: 180px;
-    height: 180px;
+  .life-card__params {
+    width: 100%;
   }
 
-  .ring-center__pct {
-    font-size: 2rem;
+  .detail-bar__grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 
-  .totals-grid {
-    grid-template-columns: 1fr;
+  .detail-bar__cell--stress {
+    grid-column: 1 / -1;
   }
 
   .stat-card__badge {
@@ -1377,7 +1358,7 @@ main.container {
   }
 
   .drawer__toggle {
-    padding: var(--sp-4);
+    padding: var(--sp-3) var(--sp-4);
   }
 
   .drawer__body .drawer__inner > * {
@@ -1410,7 +1391,8 @@ main.container {
 }
 
 /* ============================================================
-   V1.1 新增：数据安全 / 备份提醒 / 导入预览
+   V1.1：备份提醒 / 导入预览（V1.3.0 起「数据安全」静态信息已收进设置抽屉，
+   独立的 .data-safety 卡片样式随之删除，见 .drawer__data-*）
    ============================================================ */
 
 /* ---------------- 小尺寸按钮（提示条内使用） ---------------- */
@@ -1420,57 +1402,6 @@ main.container {
   padding: 0 var(--sp-3);
   font-size: var(--fs-xs);
   gap: var(--sp-1);
-}
-
-/* ---------------- 数据安全卡片 ---------------- */
-
-.data-safety {
-  display: flex;
-  flex-direction: column;
-  gap: var(--sp-3);
-}
-
-.data-safety .section-head h2 {
-  font-size: 1.125rem;
-}
-
-.data-safety__row {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: var(--sp-4);
-  flex-wrap: wrap;
-}
-
-.data-safety__info {
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
-  min-width: 0;
-}
-
-.data-safety__meta {
-  font-size: var(--fs-sm);
-  color: var(--text-primary);
-}
-
-.data-safety__sub {
-  font-size: var(--fs-xs);
-  color: var(--text-muted);
-}
-
-.data-safety__actions {
-  display: flex;
-  gap: var(--sp-2);
-  flex-wrap: wrap;
-}
-
-.data-safety__note {
-  font-size: var(--fs-xs);
-  color: var(--text-muted);
-  line-height: 1.7;
-  border-top: 1px solid var(--border);
-  padding-top: var(--sp-3);
 }
 
 /* ---------------- 备份提醒条 ---------------- */
@@ -1619,23 +1550,9 @@ main.container {
   line-height: 1.7;
 }
 
-/* ---------------- 响应式：数据安全区 ---------------- */
+/* ---------------- 响应式：备份提醒 / 导入预览 ---------------- */
 
 @media (max-width: 639px) {
-  .data-safety__row {
-    flex-direction: column;
-    align-items: stretch;
-  }
-
-  .data-safety__actions {
-    width: 100%;
-  }
-
-  .data-safety__actions .btn {
-    flex: 1 1 auto;
-    justify-content: center;
-  }
-
   .backup-banner {
     flex-direction: column;
     align-items: flex-start;
@@ -1644,6 +1561,11 @@ main.container {
 
   .backup-banner__text {
     flex: none;
+  }
+
+  /* 触屏：提示条里的按钮也要够 44px（桌面档把 .btn--sm 收到了 36px） */
+  .backup-banner .btn {
+    min-height: 44px;
   }
 
   .modal--wide .modal__body {
@@ -1660,5 +1582,166 @@ main.container {
   .backup-banner__actions .btn {
     flex: 1 1 auto;
     justify-content: center;
+  }
+}
+
+/* ============================================================
+   V1.3.0：整页统一两列栅格（宽屏）
+   ------------------------------------------------------------
+   之前 hero / 生命 / 存款各自一套列宽（1fr 1fr / 260-360px+1fr / 420px+1fr），
+   三块卡片边界互相对不齐。现在把 main 本身变成唯一的栅格容器，
+   三个 section 用 display:contents 把自己「透明化」，
+   于是所有卡片都成为同一套两列网格的直接子项 —— 左右边界严格对齐。
+   单张元素（明细条、提醒条、设置抽屉）跨整行；窄屏（<1024px）回到
+   main 的 flex 纵向堆叠，各模块各占整行。
+   ============================================================ */
+
+/* 备份提醒容器：平时整块隐藏。必须由作者样式声明，
+   否则 .module{display:flex} 会盖掉浏览器默认的 [hidden]{display:none}。 */
+#data-module[hidden] {
+  display: none;
+}
+
+@media (min-width: 1024px) {
+  main.container {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: var(--gap-grid);
+    align-content: start;
+    align-items: stretch;
+  }
+
+  /* 透明化：section 自己不产生盒子，卡片直接落进 main 的栅格 */
+  #hero,
+  #life-module,
+  #savings-module {
+    display: contents;
+  }
+
+  /* 跨整行 */
+  #data-module,
+  #settings-module,
+  .detail-bar {
+    grid-column: 1 / -1;
+  }
+
+  /* 性别三枚 chip 要在半栏宽的卡片里排成一行：桌面上整体收小
+     （触屏尺寸见手机断点里的 44px 默认值） */
+  .life-card__params {
+    --chip-h: 36px;
+    --chip-pad-x: 12px;
+    --chip-fs: var(--fs-xs);
+  }
+
+  .life-card__params .chip-group {
+    gap: 6px;
+  }
+
+  /* 桌面用鼠标，输入框 36px 足够（触屏由手机断点保证 44px） */
+  .field__input {
+    min-height: 36px;
+  }
+
+  /* ------------------------------------------------------------
+     高度收敛：实测 1440×800 这类窗口也要「一屏放完」。
+     下面每一项都是先量出各卡片的真实高度、再只压「不承载信息」的
+     部分（内边距 / 超大数字字号 / 行距 / 装饰尺寸）得到的；
+     正文、免责声明、明细条说明一律没删。
+     ------------------------------------------------------------ */
+
+  :root {
+    --card-pad: 14px;
+    --gap-grid: 10px;
+  }
+
+  .header-inner {
+    min-height: 48px;
+    padding-top: var(--sp-1);
+    padding-bottom: var(--sp-1);
+  }
+
+  .brand h1 {
+    font-size: 1.125rem;
+  }
+
+  .brand p {
+    font-size: 0.6875rem;
+  }
+
+  main.container {
+    padding-top: var(--sp-2);
+    padding-bottom: var(--sp-2);
+  }
+
+  /* 首屏两个大数字：48px → 36px，仍是最抢眼的一档 */
+  .stat-card__value {
+    font-size: clamp(1.75rem, 4.4vw, 2.25rem);
+  }
+
+  .stat-card__unit {
+    font-size: 1.125rem;
+  }
+
+  .hl-strip {
+    padding: 7px 10px;
+  }
+
+  .card-sub-stack {
+    gap: 2px;
+  }
+
+  /* 表单栅格：桌面本来两栏够宽，行距 16 → 12 */
+  .form-grid {
+    gap: var(--sp-3);
+  }
+
+  /* 明细条：5 格内容不承载在格内边距上，收一档不影响可读性 */
+  .detail-bar {
+    padding: var(--sp-3) var(--card-pad);
+  }
+
+  .detail-bar__cell {
+    padding: 7px 10px;
+  }
+
+  .detail-bar__sub {
+    font-size: 0.6875rem;
+    line-height: 1.35;
+  }
+
+  .stress-list {
+    font-size: 0.6875rem;
+  }
+
+  .drawer__toggle {
+    min-height: 42px;
+    padding: var(--sp-1) var(--sp-4);
+  }
+
+  .backup-banner {
+    padding: 5px var(--sp-3);
+  }
+
+  .btn--sm {
+    min-height: 30px;
+  }
+
+  /* 页脚压成一行：桌面宽度足够，两段文字并排不会挤。
+     footer-meta 必须 flex:none —— 否则它会被挤成窄条后
+     每个 span 各折一行，反而比两行版更高。 */
+  .site-footer {
+    padding: var(--sp-2) 0;
+  }
+
+  .site-footer .container {
+    flex-direction: row;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: space-between;
+    gap: 2px var(--sp-3);
+  }
+
+  .site-footer .footer-meta {
+    flex: none;
   }
 }

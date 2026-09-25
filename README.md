@@ -4,7 +4,7 @@
 
 > 本项目仅为个人计算工具，不提供任何金融、投资、医疗或寿命预测建议。
 
-**当前版本：`v1.2.1`**（首屏与生命模块极简化，仓库名仍沿用 `personal-survival-dashboard`）
+**当前版本：`v1.3.0`**（统一两列栅格对齐 + 一屏显示 + 手机适配 + 社交分享卡片，仓库名仍沿用 `personal-survival-dashboard`）
 
 ## 功能
 
@@ -80,6 +80,9 @@ personal-survival-dashboard/
 │       ├── components.js   # 组件工厂（含导入预览对话框）
 │       └── format.js       # 格式化工具
 ├── assets/
+│   └── og-cover.png        # 社交分享卡片图（1200×630，由 tools/og-cover.html 渲染）
+├── tools/
+│   └── og-cover.html       # OG 封面源文件（见「社交分享卡片」一节）
 ├── scripts/
 │   └── push.ps1            # 本机专用推送脚本（见「推送」一节）
 ├── UI-REQUIREMENTS.md      # 前端 UI 需求文档
@@ -91,6 +94,10 @@ personal-survival-dashboard/
 ```
 
 ## 版本历史
+
+| 版本 | 内容 |
+| --- | --- |
+| `v1.3.0` | 版式重构：①`main` 成为唯一两列栅格容器（各 section `display:contents`），所有卡片左右边界与顶边严格对齐；②高度收敛至 1440×800 / 1280×800 / 1600×900 **一屏无滚动**；③生命模块合并为单卡（进度环 + 参数）、存款模块合并为「参数卡 + 横跨整幅的 5 格明细条」，备份提醒改为平时不占高；④手机端适配（无横向溢出、触控目标 ≥44px）；⑤新增 OG / Twitter 社交分享卡片。**注意**：`.chip` 的过渡由 `all` 改为逐属性，否则 min-height/font-size 也参与过渡（会误判为样式失效） |
 
 | 版本 | 内容 |
 |---|---|
@@ -144,6 +151,28 @@ npx serve .                    # 或 npx http-server -p 8123
 
 - 站点：https://datouzhenbei.github.io/personal-survival-dashboard/
 - 仓库：https://github.com/datouzhenbei/personal-survival-dashboard
+
+## 社交分享卡片（OG）
+
+`index.html` 里已写全 `og:*` 与 `twitter:*`，`og:image` 指向
+`https://datouzhenbei.github.io/personal-survival-dashboard/assets/og-cover.png`
+（**必须是绝对地址**，微信 / QQ / X 的抓取器不会解析相对路径）。
+
+封面图是**用真实排版渲染出来的**，不是设计稿导出，改文案后重跑一条命令即可：
+
+```powershell
+# 1) 起本地服务器（封面源文件是 ES 无关的静态页，但需要 http 打开）
+python -m http.server 8125
+# 2) 用无头 Chrome 按 1200×630 截图，注意要用旧版无头（--headless=old），
+#    --headless=new 下 --screenshot 在本机不落盘
+& "C:\Program Files\Google\Chrome\Application\chrome.exe" --headless=old `
+  --disable-gpu --no-sandbox --hide-scrollbars --window-size=1200,630 `
+  --virtual-time-budget=4000 --user-data-dir="$env:TEMP\og" `
+  --screenshot="assets/og-cover.png" "http://127.0.0.1:8125/tools/og-cover.html"
+```
+
+改完图片记得**校验尺寸仍是 1200×630**（PNG 头第 17–24 字节即宽高），
+尺寸不对时聊天工具会退回成小卡。
 
 ## 推送（本机特殊情况）
 
