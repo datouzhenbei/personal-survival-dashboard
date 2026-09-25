@@ -1628,44 +1628,55 @@ main.container {
   /* 性别三枚 chip 要在半栏宽的卡片里排成一行：桌面上整体收小
      （触屏尺寸见手机断点里的 44px 默认值） */
   .life-card__params {
-    --chip-h: 36px;
-    --chip-pad-x: 12px;
-    --chip-fs: var(--fs-xs);
+    --chip-h: clamp(36px, calc(36px + (100vh - 800px) * 0.016), 44px);
+    --chip-pad-x: clamp(12px, calc(12px + (100vh - 800px) * 0.012), 20px);
+    --chip-fs: clamp(0.75rem, calc(0.75rem + (100vh - 800px) * 0.0006), 0.875rem);
   }
 
   .life-card__params .chip-group {
-    gap: 6px;
+    gap: clamp(6px, calc(6px + (100vh - 800px) * 0.008), 12px);
   }
 
   /* 桌面用鼠标，输入框 36px 足够（触屏由手机断点保证 44px） */
   .field__input {
-    min-height: 36px;
+    min-height: clamp(36px, calc(36px + (100vh - 800px) * 0.018), 50px);
   }
 
   /* ------------------------------------------------------------
-     高度收敛：实测 1440×800 这类窗口也要「一屏放完」。
-     下面每一项都是先量出各卡片的真实高度、再只压「不承载信息」的
-     部分（内边距 / 超大数字字号 / 行距 / 装饰尺寸）得到的；
-     正文、免责声明、明细条说明一律没删。
+     尺寸随「窗口高度」连续缩放（v1.3.1 起）
+     ------------------------------------------------------------
+     为什么不再写死？
+
+     v1.3.0 为了让 1440×800 一屏放完，把桌面尺寸全部写成了固定值
+     （card-pad 14px、主数字 36px…）。这套值只在「高度约 800px」的
+     窗口里才是合适的：一旦窗口高度是 1300、1400px（2K / 4K 显示器
+     全屏很常见），页面仍按 800px 的预算排版，于是内容缩成屏幕上方
+     一小块、下面留一大片黑。
+
+     现在每个量都写成
+         clamp(紧凑值, calc(紧凑值 + (100vh - 800px) * 系数), 舒适值)
+       · 窗口高 = 800px 时取到紧凑值 —— 与 v1.3.0 逐像素相同，
+         所以「1440×800 一屏」的结论不受影响；
+       · 窗口越高，尺寸线性回升，clamp 上限拦住过度放大。
      ------------------------------------------------------------ */
 
   :root {
-    --card-pad: 14px;
-    --gap-grid: 10px;
+    --card-pad: clamp(14px, calc(14px + (100vh - 800px) * 0.022), 28px);
+    --gap-grid: clamp(10px, calc(10px + (100vh - 800px) * 0.018), 20px);
   }
 
   .header-inner {
-    min-height: 48px;
+    min-height: clamp(48px, calc(48px + (100vh - 800px) * 0.03), 66px);
     padding-top: var(--sp-1);
     padding-bottom: var(--sp-1);
   }
 
   .brand h1 {
-    font-size: 1.125rem;
+    font-size: clamp(1.125rem, calc(1.125rem + (100vh - 800px) * 0.0018), 1.625rem);
   }
 
   .brand p {
-    font-size: 0.6875rem;
+    font-size: clamp(0.6875rem, calc(0.6875rem + (100vh - 800px) * 0.0005), 0.8125rem);
   }
 
   main.container {
@@ -1673,57 +1684,79 @@ main.container {
     padding-bottom: var(--sp-2);
   }
 
-  /* 首屏两个大数字：48px → 36px，仍是最抢眼的一档 */
+  /* 首屏主数字：800px 高处 36px（一屏刚好），高屏回升到 56px。
+     这里用 vh 而不是 vw 驱动 —— 要补的是「多出来的高度」，不是宽度。 */
   .stat-card__value {
-    font-size: clamp(1.75rem, 4.4vw, 2.25rem);
+    font-size: clamp(1.75rem, calc(2.25rem + (100vh - 800px) * 0.036), 3.75rem);
   }
 
   .stat-card__unit {
-    font-size: 1.125rem;
+    font-size: clamp(1.125rem, calc(1.125rem + (100vh - 800px) * 0.012), 1.625rem);
+  }
+
+  /* 卡片内部的纵向节奏也跟着放，否则卡片长高了内容还挤在顶部 */
+  .stat-card,
+  .life-card {
+    gap: clamp(8px, calc(8px + (100vh - 800px) * 0.012), 16px);
+  }
+
+  /* 生命进度环：高屏上放大，让它重新有点存在感
+     （.ring-svg 是 width/height 100%，会自动跟着缩放，里面圆点按 viewBox 等比） */
+  .life-card__ring .ring-wrap,
+  .life-card__ring .ring-placeholder {
+    width: clamp(132px, calc(132px + (100vh - 800px) * 0.13), 192px);
+    height: clamp(132px, calc(132px + (100vh - 800px) * 0.13), 192px);
+  }
+
+  .life-card__ring .ring-center__pct {
+    font-size: clamp(1.5rem, calc(1.5rem + (100vh - 800px) * 0.012), 2.25rem);
   }
 
   .hl-strip {
-    padding: 7px 10px;
+    padding: clamp(7px, calc(7px + (100vh - 800px) * 0.014), 15px)
+      clamp(10px, calc(10px + (100vh - 800px) * 0.014), 19px);
   }
 
   .card-sub-stack {
-    gap: 2px;
+    gap: clamp(2px, calc(2px + (100vh - 800px) * 0.01), 10px);
   }
 
-  /* 表单栅格：桌面本来两栏够宽，行距 16 → 12 */
+  /* 表单栅格：桌面本来两栏够宽，行距 12 就够密 */
   .form-grid {
-    gap: var(--sp-3);
+    gap: clamp(12px, calc(12px + (100vh - 800px) * 0.014), 22px);
   }
 
-  /* 明细条：5 格内容不承载在格内边距上，收一档不影响可读性 */
+  /* 明细条：5 格内容不承载在格内边距上，密集时收一档不影响可读性 */
   .detail-bar {
     padding: var(--sp-3) var(--card-pad);
   }
 
   .detail-bar__cell {
-    padding: 7px 10px;
+    padding: clamp(7px, calc(7px + (100vh - 800px) * 0.013), 16px)
+      clamp(10px, calc(10px + (100vh - 800px) * 0.013), 19px);
   }
 
+  /* 11px 的说明字在 27 寸 2K 上是真的小；高屏放宽到 13px */
   .detail-bar__sub {
-    font-size: 0.6875rem;
+    font-size: clamp(0.6875rem, calc(0.6875rem + (100vh - 800px) * 0.0007), 0.8125rem);
     line-height: 1.35;
   }
 
   .stress-list {
-    font-size: 0.6875rem;
+    font-size: clamp(0.6875rem, calc(0.6875rem + (100vh - 800px) * 0.0007), 0.8125rem);
   }
 
   .drawer__toggle {
-    min-height: 42px;
+    min-height: clamp(42px, calc(42px + (100vh - 800px) * 0.02), 56px);
     padding: var(--sp-1) var(--sp-4);
   }
 
   .backup-banner {
-    padding: 5px var(--sp-3);
+    padding: clamp(5px, calc(5px + (100vh - 800px) * 0.01), 14px) var(--sp-3);
   }
 
   .btn--sm {
-    min-height: 30px;
+    min-height: clamp(30px, calc(30px + (100vh - 800px) * 0.012), 40px);
   }
 
   /* 页脚压成一行：桌面宽度足够，两段文字并排不会挤。
@@ -1743,5 +1776,28 @@ main.container {
 
   .site-footer .footer-meta {
     flex: none;
+  }
+}
+
+/* ------------------------------------------------------------
+   宽屏：容器上限从 1200px 分两档放开（v1.3.1 起）
+   ------------------------------------------------------------
+   1200px 在 1440 宽的窗口里几乎是满宽（1440-48=1392 > 1200，勉强够用），
+   但在 2560 宽的 2K 屏上只占中间 47% —— 左右各空 680px，页面上看
+   就是「内容缩成中间一小条」。
+
+   这两档只放宽 width，不动其它尺寸：列变宽后文字换行更少、
+   卡片只会更矮，所以不会破坏「1440×800 一屏」的既有结论
+   （1440 宽根本不进这两档，1600 宽进第一档、实测更矮）。
+   ------------------------------------------------------------ */
+@media (min-width: 1600px) {
+  :root {
+    --max-width: 1320px;
+  }
+}
+
+@media (min-width: 2200px) {
+  :root {
+    --max-width: 1520px;
   }
 }
