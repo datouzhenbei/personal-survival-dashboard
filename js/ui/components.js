@@ -131,14 +131,18 @@ export function icon(name, size = 18) {
  * @param {string} [opts.iconName] 标题图标
  * @param {string} opts.value 主数值文本
  * @param {string} [opts.unit] 单位（如「天」「个月」）
- * @param {string} [opts.sub] 副信息
+ * @param {string} [opts.sub] 副信息（纯文本）
+ * @param {Node} [opts.subNode] 副信息（自定义节点，优先于 sub）
+ * @param {string} [opts.subClass] 自定义副信息容器类名（配合 subNode 使用）
  * @param {string} [opts.badge] 角标
  * @param {'accent'|'success'|'danger'|'muted'} [opts.tone='accent'] 主数值色调
  */
 export function createStatCard(opts) {
   const valueEl = h('span', { class: 'stat-card__value', text: opts.value ?? '—' });
   const unitEl = opts.unit ? h('span', { class: 'stat-card__unit', text: opts.unit }) : null;
-  const subEl = h('p', { class: 'stat-card__sub', text: opts.sub ?? '' });
+  const subEl = opts.subNode
+    ? h('div', { class: opts.subClass || 'stat-card__sub' }, [].concat(opts.subNode))
+    : h('p', { class: 'stat-card__sub', text: opts.sub ?? '' });
   const badgeEl = opts.badge ? h('span', { class: 'stat-card__badge', text: opts.badge }) : null;
 
   const root = h('div', { class: `card stat-card stat-card--${opts.tone || 'accent'}` }, [

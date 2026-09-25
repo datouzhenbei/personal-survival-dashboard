@@ -9,7 +9,7 @@ export const Config = {
   // 数据 schema 版本，便于未来迁移（备份文件中的 schemaVersion 即此值）
   STORAGE_VERSION: 1,
   // 应用版本，仅用于页脚显示与备份文件溯源
-  APP_VERSION: 'v1.1.0',
+  APP_VERSION: 'v1.2.0',
 
   KEYS: {
     PROFILE: 'psd_profile',     // 个人档案：出生日期、性别、退休年龄
@@ -92,7 +92,7 @@ export const Config = {
   },
 
   DISCLAIMER:
-    '本看板仅为「剩余生命时间」与「存款可支撑时长」的本地计算工具，' +
+    '本工具只把「还能活多久」与「钱还能撑多久」两组数字做本地换算，' +
     '不提供任何金融、投资、医疗或寿命预测建议。' +
     '所有数据仅保存在你的浏览器本地，不上传任何服务器。',
 

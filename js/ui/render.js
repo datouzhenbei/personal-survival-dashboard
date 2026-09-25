@@ -44,8 +44,52 @@ function tickingRemaining(stats) {
   return `${b.years} 年 ${b.remDays} 天 ${formatClock(b.hours, b.minutes, b.seconds)}`;
 }
 
-function heroLifeSub(stats) {
-  return tickingRemaining(stats);
+/** 剩余寿命拆成「N 年 M 天」（不含时分秒，供高亮条大号展示） */
+function remainingYearsDays(stats) {
+  if (stats.isOver) return `已超期 ${formatInt(stats.breakdown.days)} 天`;
+  return `${stats.breakdown.years} 年 ${stats.breakdown.remDays} 天`;
+}
+
+/** 剩余寿命的秒级时钟（已超期时无意义，返回空串） */
+function remainingClock(stats) {
+  if (stats.isOver) return '';
+  const b = stats.breakdown;
+  return formatClock(b.hours, b.minutes, b.seconds);
+}
+
+/** 高亮条右侧胶囊：key 小标签 + value 文本 */
+function stripPill(key, value) {
+  return h('span', { class: 'hl-strip__gg' }, [
+    h('span', { class: 'hl-strip__gg-key', text: key }),
+    h('span', { class: 'hl-strip__gg-val', text: value }),
+  ]);
+}
+
+/** 「GG」胶囊：按设定预期寿命推算的终点日期 */
+function ggPill(date, { isOver = false } = {}) {
+  return stripPill(isOver ? '已 GG' : 'GG', formatDate(date));
+}
+
+/**
+ * 高亮条：左侧一组数字，右侧可选胶囊
+ * @param {Node[]} leftNodes
+ * @param {Node|null} rightNode
+ * @param {string} [modifier] 额外修饰类（如 hl-strip--good）
+ */
+function hlStrip(leftNodes, rightNode, modifier) {
+  return h('div', { class: modifier ? `hl-strip ${modifier}` : 'hl-strip' }, [
+    h('span', { class: 'hl-strip__left' }, leftNodes),
+    rightNode || null,
+  ]);
+}
+
+/** 存款耗尽日 vs 寿命终点：哪个先到 */
+function savingsVerdict(depletionDate, lifeEndDate) {
+  if (!depletionDate || !lifeEndDate) return null;
+  const d = depletionDate instanceof Date ? depletionDate : new Date(depletionDate);
+  const e = lifeEndDate instanceof Date ? lifeEndDate : new Date(lifeEndDate);
+  if (isNaN(d.getTime()) || isNaN(e.getTime())) return null;
+  return d.getTime() >= e.getTime() ? '钱比命长 · 放心花' : '人还在 · 钱先没了';
 }
 
 /* ---------------- Hero 首屏总览 ---------------- */
@@ -53,18 +97,27 @@ function heroLifeSub(stats) {
 export function renderHero(container, ctx) {
   container.replaceChildren();
 
-  // —— 卡 A：剩余生命时间 ——
+  // 寿命终点，用于与存款耗尽日做对比（无生命数据时为 null）
+  const lifeEnd = ctx.lifeStats ? ctx.lifeStats.endDate : null;
+
+  // —— 卡 A：我还能活多久 ——
   let cardA;
   let updateA = null;
   if (ctx.lifeStats) {
     const s = ctx.lifeStats;
     const tone = s.isOver ? 'success' : 'accent';
+
+    // 高亮条：左侧「N 年 M 天 + 秒级时钟」，右侧 GG 日期胶囊
+    const yearsDaysEl = h('span', { class: 'hl-strip__main', text: remainingYearsDays(s) });
+    const clockEl = h('span', { class: 'hl-strip__clock', text: remainingClock(s) });
+
     cardA = createStatCard({
-      title: '剩余生命时间',
+      title: '我还能活多久',
       iconName: 'hourglass',
       value: formatInt(s.breakdown.days),
       unit: '天',
-      sub: heroLifeSub(s),
+      subNode: hlStrip([yearsDaysEl, clockEl], ggPill(s.endDate, { isOver: s.isOver })),
+      subClass: 'card-sub-stack',
       tone,
     });
     const badge = h('span', { class: 'stat-card__badge' }, [
@@ -77,11 +130,12 @@ export function renderHero(container, ctx) {
 
     updateA = (stats) => {
       cardA.refs.value.textContent = formatInt(stats.breakdown.days);
-      cardA.refs.sub.textContent = heroLifeSub(stats);
+      yearsDaysEl.textContent = remainingYearsDays(stats);
+      clockEl.textContent = remainingClock(stats);
     };
   } else {
     cardA = createStatCard({
-      title: '剩余生命时间',
+      title: '我还能活多久',
       iconName: 'hourglass',
       value: '——',
       sub: ctx.lifeError ? '参数有误，请检查下方生命倒计时设置' : '在下方填写出生日期后开始倒计时',
@@ -89,35 +143,63 @@ export function renderHero(container, ctx) {
     });
   }
 
-  // —— 卡 B：存款可支撑时长 ——
+  // —— 卡 B：钱还能撑多久 ——
   let cardB;
   if (ctx.savingsCfg && ctx.result) {
     const r = ctx.result;
     const m = formatMonthsLeft(r.monthsLeft, Config.LIMITS.maxSimMonths);
     const isNumeric = isFinite(r.monthsLeft) && r.monthsLeft < Config.LIMITS.maxSimMonths;
-    let sub;
-    if (r.isSustainable) {
-      sub = '— 不会耗尽 —';
-    } else if (!r.depletionDate) {
-      sub = `模拟 ${Config.LIMITS.maxSimMonths / 12} 年仍未耗尽`;
-    } else {
-      sub = `${r.yearsLeft} 年 ${r.remainingMonths} 个月 · 耗尽于 ${formatDate(r.depletionDate)}`;
-    }
     const burn = r.monthlyBurn;
     const burnLabel =
       burn > 0 ? `月净消耗 ${formatMoney(burn, ctx.symbol)}` : '月收支盈余';
+
+    const subParts = [];
+    if (r.isSustainable) {
+      subParts.push(
+        hlStrip(
+          [h('span', { class: 'hl-strip__main', text: '不会耗尽' })],
+          stripPill('稳', '月收支有盈余'),
+          'hl-strip--good',
+        ),
+      );
+    } else if (!r.depletionDate) {
+      subParts.push(
+        hlStrip([
+          h('span', {
+            class: 'hl-strip__main',
+            text: `模拟 ${Config.LIMITS.maxSimMonths / 12} 年仍未耗尽`,
+          }),
+        ]),
+      );
+    } else {
+      subParts.push(
+        hlStrip(
+          [
+            h('span', {
+              class: 'hl-strip__main',
+              text: `${r.yearsLeft} 年 ${r.remainingMonths} 个月`,
+            }),
+          ],
+          stripPill('耗尽', formatDate(r.depletionDate)),
+        ),
+      );
+      const verdict = savingsVerdict(r.depletionDate, lifeEnd);
+      if (verdict) subParts.push(h('p', { class: 'card-sub-note', text: verdict }));
+    }
+
     cardB = createStatCard({
-      title: '存款可支撑时长',
+      title: '钱还能撑多久',
       iconName: 'wallet',
       value: m.text,
       unit: isNumeric ? '个月' : null,
-      sub,
+      subNode: subParts,
+      subClass: 'card-sub-stack',
       badge: burnLabel,
       tone: m.tone === 'success' ? 'success' : 'accent',
     });
   } else {
     cardB = createStatCard({
-      title: '存款可支撑时长',
+      title: '钱还能撑多久',
       iconName: 'wallet',
       value: '——',
       sub: ctx.savingsError

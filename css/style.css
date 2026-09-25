@@ -395,6 +395,131 @@ main.container {
 }
 .stat-card--muted .stat-card__value {
   color: var(--text-muted);
+  /* 无数据/报错时的占位符「——」在 hero 字号下会被读成「加载进度条」，
+     这里单独收小，让它明确是「还没填」而不是「还在加载」。 */
+  font-size: var(--fs-h2);
+}
+
+/* ---------------- 首屏高亮条（V1.2 趣味化） ----------------
+   用途：把「39 年 286 天 · 14:22:25 · GG 日期」这类关键副信息
+   从灰色小字升级为一块醒目的强调面板。 */
+
+.card-sub-stack {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-2);
+  min-height: 1.5em;
+}
+
+.hl-strip {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--sp-2) var(--sp-3);
+  flex-wrap: wrap;
+  padding: 12px 14px;
+  border-radius: var(--radius-md);
+  background: var(--accent-soft);
+  border: 1px solid rgba(245, 166, 35, 0.26);
+}
+
+.hl-strip__left {
+  display: inline-flex;
+  align-items: baseline;
+  flex-wrap: wrap;
+  gap: var(--sp-2) var(--sp-3);
+  min-width: 0;
+}
+
+.hl-strip__main {
+  font-size: clamp(1.25rem, 4.6vw, 1.75rem);
+  font-weight: 650;
+  line-height: 1.2;
+  letter-spacing: -0.01em;
+  color: var(--accent);
+  font-variant-numeric: tabular-nums;
+}
+
+.hl-strip__clock {
+  font-size: var(--fs-sm);
+  font-weight: 500;
+  color: var(--accent);
+  opacity: 0.85;
+  font-variant-numeric: tabular-nums;
+}
+
+.hl-strip__gg {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 6px;
+  font-size: var(--fs-sm);
+  color: var(--text-secondary);
+  white-space: nowrap;
+}
+
+.hl-strip__gg-key {
+  font-size: var(--fs-xs);
+  font-weight: 650;
+  letter-spacing: 0.06em;
+  color: var(--text-primary);
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-sm);
+  padding: 1px 6px;
+}
+
+.hl-strip__gg-val {
+  font-variant-numeric: tabular-nums;
+}
+
+/* 绿色变体：可持续 / 已超期等正向状态 */
+.hl-strip--good {
+  background: var(--success-soft);
+  border-color: rgba(34, 197, 94, 0.26);
+}
+
+.hl-strip--good .hl-strip__main,
+.hl-strip--good .hl-strip__clock,
+.stat-card--success .hl-strip__main,
+.stat-card--success .hl-strip__clock {
+  color: var(--success);
+}
+
+.stat-card--success .hl-strip {
+  background: var(--success-soft);
+  border-color: rgba(34, 197, 94, 0.26);
+}
+
+/* 展开结论行：存款耗尽日与寿命终点谁先到 */
+.card-sub-note {
+  font-size: var(--fs-xs);
+  color: var(--text-secondary);
+}
+
+.card-sub-note::before {
+  content: '→ ';
+  color: var(--text-muted);
+}
+
+@media (max-width: 639px) {
+  .hl-strip {
+    padding: 10px 12px;
+  }
+
+  .hl-strip__main {
+    font-size: 1.25rem;
+  }
+}
+
+@media (max-width: 400px) {
+  .hl-strip {
+    padding: 10px;
+    gap: var(--sp-2);
+  }
+
+  .hl-strip__left {
+    gap: var(--sp-2);
+  }
 }
 
 /* ---------------- 模块通用 ---------------- */
