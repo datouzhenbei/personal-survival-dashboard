@@ -32,8 +32,8 @@ export class SavingsCalculator {
     if (this.savings < 0) throw new Error('savings 不能为负');
     if (this.monthlyExpense < 0) throw new Error('monthlyExpense 不能为负');
     if (this.monthlyIncome < 0) throw new Error('monthlyIncome 不能为负');
-    if (this.inflationRate < 0 || this.inflationRate > 100) {
-      throw new Error('inflationRate 取值异常（0-100）');
+    if (this.inflationRate < 0 || this.inflationRate > 1000) {
+      throw new Error('inflationRate 取值异常（0-1000）');
     }
   }
 
@@ -61,8 +61,10 @@ export class SavingsCalculator {
       };
     }
 
-    // 支出为 0 且有存款 → 理论上无限
-    if (this.monthlyExpense <= 0 && this.savings > 0) {
+    // 支出为 0 → 不会被日常消耗耗尽（无论存款多少）
+    // 注：旧版条件为 `monthlyExpense <= 0 && savings > 0`，导致「存款 0 且支出 0」
+    // 落入逐月循环，误报为「1 个月」并伪造出耗尽日期。
+    if (this.monthlyExpense <= 0) {
       return {
         monthsLeft: Infinity,
         yearsLeft: Infinity,
@@ -75,6 +77,23 @@ export class SavingsCalculator {
         isSustainable: true,
         inflationUsed: this.inflationRate,
         note: '月支出为 0，存款不会因日常消耗耗尽。',
+      };
+    }
+
+    // 无存款、且支出无法被收入覆盖 → 立即无法支撑（避免伪造出「1 个月」与耗尽日期）
+    if (this.savings <= 0) {
+      return {
+        monthsLeft: 0,
+        yearsLeft: 0,
+        remainingMonths: 0,
+        depletionDate: null,
+        monthlyBurn: baseBurn,
+        totalSpent: 0,
+        totalIncome: 0,
+        finalBalance: 0,
+        isSustainable: false,
+        inflationUsed: this.inflationRate,
+        note: '当前存款为 0，无法覆盖月支出。',
       };
     }
 

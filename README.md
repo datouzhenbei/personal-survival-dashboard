@@ -51,14 +51,21 @@ import { Config, Storage, LifeCountdown, SavingsCalculator } from './js/core/ind
 
 ## 本地运行
 
-直接用浏览器打开 `index.html` 即可（需支持 ES Module 的现代浏览器）。
-推荐用本地静态服务器：
+本项目使用 **ES Module**（`<script type="module">` + `import`），受浏览器同源策略限制：**直接双击 `index.html`（`file://` 协议）会因 CORS 报错而白屏**，必须通过 HTTP 打开。
+
+任选一种本地静态服务器（在项目根目录执行）：
 
 ```bash
-# 任选其一
-python -m http.server 8080
-npx serve .
+python -m http.server 8123     # 然后访问 http://localhost:8123
+npx serve .                    # 或 npx http-server -p 8123
 ```
+
+## 在线访问
+
+已部署到 GitHub Pages（源码 push 后自动发布）：
+
+- 站点：https://datouzhenbei.github.io/personal-survival-dashboard/
+- 仓库：https://github.com/datouzhenbei/personal-survival-dashboard
 
 ## 免责声明
 

@@ -1,0 +1,672 @@
+/**
+ * render.js — 页面模块渲染函数
+ * 职责：依据 app.js 传入的状态与 core 计算结果，渲染
+ *   1) Hero 首屏总览（剩余生命天数 / 存款可支撑月数）
+ *   2) 生命倒计时模块（进度环 + 参数 + 详情）
+ *   3) 存款生存计算器模块（输入卡 + 结果卡 + 压力测试）
+ *   4) 设置抽屉（偏好、重置、导入/导出入口）
+ * 本文件不做任何业务计算，不直接访问 localStorage。
+ * 每个渲染函数返回一个 updater(stats)（或 null），供每秒时钟刷新时只更新文本节点。
+ */
+import { Config } from '../core/index.js';
+import {
+  h,
+  icon,
+  createStatCard,
+  createProgressRing,
+  createField,
+  createChipGroup,
+  createDataTable,
+} from './components.js';
+import {
+  formatDate,
+  formatMoney,
+  formatInt,
+  formatPercent,
+  formatClock,
+  formatMonthsLeft,
+} from './format.js';
+
+/* ---------------- 通用小部件 ---------------- */
+
+function sectionHead(title, iconName) {
+  return h('div', { class: 'section-head' }, [
+    icon(iconName, 18),
+    h('h2', { text: title }),
+  ]);
+}
+
+function tickingRemaining(stats) {
+  if (stats.isOver) return `已超过设定预期寿命 ${stats.breakdown.days} 天`;
+  const b = stats.breakdown;
+  return `${b.years} 年 ${b.remDays} 天 ${formatClock(b.hours, b.minutes, b.seconds)}`;
+}
+
+function heroLifeSub(stats) {
+  return tickingRemaining(stats);
+}
+
+/* ---------------- Hero 首屏总览 ---------------- */
+
+export function renderHero(container, ctx) {
+  container.replaceChildren();
+
+  // —— 卡 A：剩余生命时间 ——
+  let cardA;
+  let updateA = null;
+  if (ctx.lifeStats) {
+    const s = ctx.lifeStats;
+    const tone = s.isOver ? 'success' : 'accent';
+    cardA = createStatCard({
+      title: '剩余生命时间',
+      iconName: 'hourglass',
+      value: formatInt(s.breakdown.days),
+      unit: '天',
+      sub: heroLifeSub(s),
+      tone,
+    });
+    const badge = h('span', { class: 'stat-card__badge' }, [
+      h('span', { text: `已活 ${formatPercent(s.percentLived)}` }),
+      h('span', { class: 'stat-card__badge-sep', text: '·' }),
+      h('span', { text: s.isOver ? '已超期' : `剩余 ${formatPercent(s.percentRemaining)}` }),
+    ]);
+    cardA.root.querySelector('.stat-card__head').appendChild(badge);
+    cardA.refs.badge = badge;
+
+    updateA = (stats) => {
+      cardA.refs.value.textContent = formatInt(stats.breakdown.days);
+      cardA.refs.sub.textContent = heroLifeSub(stats);
+    };
+  } else {
+    cardA = createStatCard({
+      title: '剩余生命时间',
+      iconName: 'hourglass',
+      value: '——',
+      sub: ctx.lifeError ? '参数有误，请检查下方生命倒计时设置' : '在下方填写出生日期后开始倒计时',
+      tone: 'muted',
+    });
+  }
+
+  // —— 卡 B：存款可支撑时长 ——
+  let cardB;
+  if (ctx.savingsCfg && ctx.result) {
+    const r = ctx.result;
+    const m = formatMonthsLeft(r.monthsLeft, Config.LIMITS.maxSimMonths);
+    const isNumeric = isFinite(r.monthsLeft) && r.monthsLeft < Config.LIMITS.maxSimMonths;
+    let sub;
+    if (r.isSustainable) {
+      sub = '— 不会耗尽 —';
+    } else if (!r.depletionDate) {
+      sub = `模拟 ${Config.LIMITS.maxSimMonths / 12} 年仍未耗尽`;
+    } else {
+      sub = `${r.yearsLeft} 年 ${r.remainingMonths} 个月 · 耗尽于 ${formatDate(r.depletionDate)}`;
+    }
+    const burn = r.monthlyBurn;
+    const burnLabel =
+      burn > 0 ? `月净消耗 ${formatMoney(burn, ctx.symbol)}` : '月收支盈余';
+    cardB = createStatCard({
+      title: '存款可支撑时长',
+      iconName: 'wallet',
+      value: m.text,
+      unit: isNumeric ? '个月' : null,
+      sub,
+      badge: burnLabel,
+      tone: m.tone === 'success' ? 'success' : 'accent',
+    });
+  } else {
+    cardB = createStatCard({
+      title: '存款可支撑时长',
+      iconName: 'wallet',
+      value: '——',
+      sub: ctx.savingsError
+        ? '参数有误，请检查存款计算器输入'
+        : '在下方填写存款与月支出后开始计算',
+      tone: 'muted',
+    });
+  }
+
+  container.append(cardA.root, cardB.root);
+  return updateA;
+}
+
+/* ---------------- 生命倒计时模块 ---------------- */
+
+const GENDER_OPTIONS = [
+  { value: 'male', label: '男' },
+  { value: 'female', label: '女' },
+  { value: 'unspecified', label: '不指定' },
+];
+
+/** 首次使用引导卡 */
+function renderLifeGuide(ctx) {
+  const birthField = createField({
+    id: 'f-birth',
+    label: '出生日期',
+    type: 'date',
+    value: '',
+    onChange: (e) => commit(e),
+  });
+  const genderChips = createChipGroup({
+    name: '性别',
+    options: GENDER_OPTIONS,
+    value: 'unspecified',
+  });
+
+  function currentGender() {
+    return genderChips.group.querySelector('.chip.is-selected')?.dataset.value ||
+      'unspecified';
+  }
+  function commit(e, chipValue) {
+    const hint = chipValue ? `chip:${chipValue}` : (e?.relatedTarget?.id || null);
+    const err = ctx.actions.onProfileCommit(
+      { birthDate: birthField.input.value, gender: currentGender(), lifeExpectancy: '', retirementAge: '' },
+      'birthDate',
+      hint,
+    );
+    birthField.setError(err && err.field === 'birthDate' ? err.message : null);
+  }
+
+  genderChips.group.addEventListener('click', (e) => {
+    const btn = e.target.closest('.chip');
+    if (!btn) return;
+    commit(e, btn.dataset.value);
+  });
+
+  return h('div', { class: 'card guide' }, [
+    h('div', { class: 'guide__icon' }, [icon('hourglass', 22)]),
+    h('h3', { class: 'guide__title', text: '先建立你的生命倒计时' }),
+    h('p', {
+      class: 'guide__desc',
+      text: '填写出生日期与性别即可开始。预期寿命仅按你设定的数值做线性时间换算，不做任何寿命预测。',
+    }),
+    h('div', { class: 'form-grid form-grid--2' }, [birthField.root, genderChips.root]),
+    h('p', { class: 'field__hint', text: Config.LIFE_EXPECTANCY_NOTE }),
+  ]);
+}
+
+function detailRow(label, valueNode, id) {
+  return h('div', { class: 'detail-row' }, [
+    h('dt', { text: label }),
+    h('dd', id ? { id } : {}, [valueNode]),
+  ]);
+}
+
+/** 已配置后的生命模块 */
+function renderLifePanel(ctx) {
+  const profile = ctx.state.profile;
+  const stats = ctx.lifeStats;
+
+  const birthField = createField({
+    id: 'f-birth',
+    label: '出生日期',
+    type: 'date',
+    value: profile.birthDate || '',
+    onChange: (e) => commit('birthDate', e),
+  });
+  const genderChips = createChipGroup({
+    name: '性别',
+    options: GENDER_OPTIONS,
+    value: profile.gender || 'unspecified',
+  });
+  const lifeExpField = createField({
+    id: 'f-life-exp',
+    label: '预期寿命（岁）',
+    type: 'number',
+    value: profile.lifeExpectancy ?? '',
+    placeholder: '留空使用性别默认',
+    min: 1,
+    max: Config.LIMITS.maxLifeExpectancy,
+    unit: '岁',
+    hint: Config.LIFE_EXPECTANCY_NOTE,
+    onChange: (e) => commit('lifeExpectancy', e),
+  });
+  const retireField = createField({
+    id: 'f-retire',
+    label: '退休年龄（岁）',
+    type: 'number',
+    value: profile.retirementAge ?? '',
+    placeholder: '留空使用性别默认',
+    min: 1,
+    max: Config.LIMITS.maxLifeExpectancy,
+    unit: '岁',
+    hint: '用于计算距离退休的天数',
+    onChange: (e) => commit('retirementAge', e),
+  });
+
+  function values() {
+    return {
+      birthDate: birthField.input.value,
+      gender:
+        genderChips.group.querySelector('.chip.is-selected')?.dataset.value || 'unspecified',
+      lifeExpectancy: lifeExpField.input.value.trim(),
+      retirementAge: retireField.input.value.trim(),
+    };
+  }
+  function commit(sourceField, e, chipValue) {
+    [birthField, lifeExpField, retireField].forEach((f) => f.setError(null));
+    const hint = chipValue ? `chip:${chipValue}` : (e?.relatedTarget?.id || null);
+    const err = ctx.actions.onProfileCommit(values(), sourceField, hint);
+    if (err) {
+      const map = { birthDate: birthField, lifeExpectancy: lifeExpField, retirementAge: retireField };
+      if (map[err.field]) map[err.field].setError(err.message);
+    }
+  }
+
+  genderChips.group.addEventListener('click', (e) => {
+    const btn = e.target.closest('.chip');
+    if (btn) commit('gender', e, btn.dataset.value);
+  });
+
+  const paramsCard = h('div', { class: 'card form-card' }, [
+    h('h3', { class: 'card__title', text: '参数' }),
+    h('div', { class: 'form-grid form-grid--2' }, [birthField.root, genderChips.root]),
+    h('div', { class: 'form-grid form-grid--2' }, [lifeExpField.root, retireField.root]),
+  ]);
+
+  // —— 进度环卡 ——
+  const ring = stats
+    ? createProgressRing(stats.percentLived, {
+        isOver: stats.isOver,
+        centerLabel: stats.isOver ? '已超期' : '已度过',
+      })
+    : null;
+  const ringCard = h('div', { class: 'card ring-card' }, [
+    ring ? ring.root : h('div', { class: 'ring-placeholder', text: '暂不可用' }),
+    stats
+      ? h('p', {
+          class: `ring-card__note${stats.isOver ? ' is-over' : ''}`,
+          text: stats.isOver
+            ? `已超过设定预期寿命 ${stats.breakdown.days} 天，愿每一天都值得`
+            : `按预期寿命 ${stats.lifeExpectancy} 岁线性换算`,
+        })
+      : null,
+  ]);
+
+  // —— 详情列表 ——
+  let remainingNode = h('span', { text: '—' });
+  let detailsCard;
+  if (stats) {
+    const s = stats;
+    const livedYears = s.age;
+    const livedRemDays = Math.min(
+      364,
+      Math.max(0, Math.floor((s.ageDecimal - livedYears) * 365.25)),
+    );
+
+    const birthdayText =
+      s.daysUntilNextBirthday === 0
+        ? '就是今天，生日快乐'
+        : `距 ${s.daysUntilNextBirthday} 天`;
+    const now = new Date();
+    const retired = s.retirementDate.getTime() <= now.getTime();
+    const retirementText = retired
+      ? '已到退休年龄'
+      : `距 ${s.daysUntilRetirement} 天`;
+
+    remainingNode = h('span', { class: 'tick-text', text: tickingRemaining(s) });
+
+    detailsCard = h('div', { class: 'card details-card' }, [
+      h('h3', { class: 'card__title', text: '时间详情' }),
+      h('dl', { class: 'detail-list' }, [
+        detailRow(
+          '当前年龄',
+          `${s.age} 岁（约 ${s.ageDecimal.toFixed(1)} 岁）`,
+        ),
+        detailRow('出生日期', formatDate(s.birthDate)),
+        detailRow('已度过', `${livedYears} 年 ${livedRemDays} 天`),
+        detailRow(
+          s.isOver ? '超出预期' : '剩余时间',
+          remainingNode,
+          'life-remaining',
+        ),
+        detailRow(
+          '下次生日',
+          h('span', {}, [
+            formatDate(s.nextBirthday),
+            h('span', { class: 'detail-sub', text: `（${birthdayText}）` }),
+          ]),
+        ),
+        detailRow(
+          '退休日',
+          h('span', {}, [
+            formatDate(s.retirementDate),
+            h('span', { class: 'detail-sub', text: `（${retirementText}）` }),
+          ]),
+        ),
+      ]),
+    ]);
+  } else {
+    detailsCard = h('div', { class: 'card details-card' }, [
+      h('h3', { class: 'card__title', text: '时间详情' }),
+      h('p', { class: 'card__error', text: ctx.lifeError || '当前参数无法计算，请检查输入。' }),
+    ]);
+  }
+
+  return h('div', { class: 'life-grid' }, [
+    ringCard,
+    h('div', { class: 'life-side' }, [paramsCard, detailsCard]),
+  ]);
+}
+
+export function renderLifeSection(container, ctx) {
+  container.replaceChildren(sectionHead('生命倒计时', 'hourglass'));
+  if (!ctx.state.profile) {
+    container.appendChild(renderLifeGuide(ctx));
+    return null;
+  }
+  const panel = renderLifePanel(ctx);
+  container.appendChild(panel);
+
+  // 每秒仅更新「剩余时间」文本节点
+  return (stats) => {
+    const node = document.getElementById('life-remaining');
+    if (node) node.textContent = tickingRemaining(stats);
+  };
+}
+
+/* ---------------- 存款生存计算器模块 ---------------- */
+
+const SAVINGS_FIELDS = [
+  { key: 'savings', id: 'f-savings', label: '当前存款', unit: '元', min: 0, step: 100, placeholder: '0' },
+  { key: 'monthlyExpense', id: 'f-expense', label: '月支出', unit: '元', min: 0, step: 100, placeholder: '0' },
+  { key: 'monthlyIncome', id: 'f-income', label: '月收入（可空 = 0）', unit: '元', min: 0, step: 100, placeholder: '0' },
+];
+
+function renderSavingsResults(ctx) {
+  const r = ctx.result;
+  const symbol = ctx.symbol;
+
+  // 错误优先于空状态：若 core 抛错，即使 result 为 null 也要展示真实原因，
+  // 否则会被「还没有存款数据」误导。
+  if (ctx.savingsError) {
+    return h('div', { class: 'empty' }, [
+      h('h3', { class: 'empty__title', text: '暂时无法计算' }),
+      h('p', { class: 'card__error', text: ctx.savingsError }),
+    ]);
+  }
+
+  if (!r) {
+    return h('div', { class: 'empty' }, [
+      h('div', { class: 'empty__icon' }, [icon('wallet', 24)]),
+      h('h3', { class: 'empty__title', text: '还没有存款数据' }),
+      h('p', {
+        class: 'empty__desc',
+        text: '在左侧填写当前存款与月支出，失焦后自动计算并保存在本机，无需点击按钮。',
+      }),
+    ]);
+  }
+
+  const m = formatMonthsLeft(r.monthsLeft, Config.LIMITS.maxSimMonths);
+  const isNumeric = isFinite(r.monthsLeft) && r.monthsLeft < Config.LIMITS.maxSimMonths;
+
+  // 月净消耗：支出 − 收入 = 净
+  const burn = r.monthlyBurn;
+  const burnTone = burn > 0 ? 'danger' : burn < 0 ? 'success' : 'muted';
+  const burnText = burn > 0 ? '月消耗' : burn < 0 ? '月盈余' : '收支持平';
+
+  const burnRow = h('div', { class: 'burn-row' }, [
+    h('div', { class: 'burn-eq' }, [
+      h('span', { class: 'burn-eq__item', text: `月支出 ${formatMoney(ctx.cfgVals.monthlyExpense, symbol)}` }),
+      h('span', { class: 'burn-eq__op', text: '−' }),
+      h('span', { class: 'burn-eq__item', text: `月收入 ${formatMoney(ctx.cfgVals.monthlyIncome, symbol)}` }),
+    ]),
+    h('div', { class: `burn-result tone-${burnTone}` }, [
+      h('span', { class: 'burn-result__label', text: burnText }),
+      h('span', {
+        class: 'burn-result__value',
+        text: formatMoney(Math.abs(burn), symbol),
+      }),
+    ]),
+  ]);
+
+  const totals = h('div', { class: 'totals-grid' }, [
+    h('div', { class: 'total-item' }, [
+      h('span', { class: 'total-item__label', text: '耗尽日期' }),
+      h('span', {
+        class: 'total-item__value',
+        text: r.depletionDate ? formatDate(r.depletionDate) : '— 不会耗尽 —',
+      }),
+    ]),
+    h('div', { class: 'total-item' }, [
+      h('span', { class: 'total-item__label', text: '模拟期累计支出' }),
+      h('span', {
+        class: 'total-item__value',
+        text: r.isSustainable ? '—' : formatMoney(r.totalSpent, symbol),
+      }),
+    ]),
+    h('div', { class: 'total-item' }, [
+      h('span', { class: 'total-item__label', text: '模拟期累计收入' }),
+      h('span', {
+        class: 'total-item__value',
+        text: r.isSustainable ? '—' : formatMoney(r.totalIncome, symbol),
+      }),
+    ]),
+  ]);
+
+  const stress = ctx.stress;
+  const toRow = (label, months) => {
+    if (months === null || months === undefined || Number.isNaN(months)) {
+      return { label, value: '—', tone: 'muted' };
+    }
+    const mm = formatMonthsLeft(months, Config.LIMITS.maxSimMonths);
+    return {
+      label,
+      value: mm.tone === 'success' ? '可持续' : isFinite(months) && months >= Config.LIMITS.maxSimMonths
+        ? `${Config.LIMITS.maxSimMonths / 12} 年以上`
+        : `${formatInt(months)} 个月`,
+      tone: mm.tone,
+    };
+  };
+  const stressTable = stress
+    ? createDataTable([
+        toRow('支出 +20%', stress.expenseUp20),
+        toRow('收入 −50%', stress.incomeDown50),
+        toRow('通胀率翻倍', stress.inflationDoubled),
+      ])
+    : null;
+
+  return h('div', { class: 'result-panel' }, [
+    h('div', { class: 'result-hero' }, [
+      h('span', { class: `result-hero__value tone-${m.tone}`, text: m.text }),
+      isNumeric ? h('span', { class: 'result-hero__unit', text: '个月' }) : null,
+    ]),
+    h('p', { class: 'result-hero__sub', text: isNumeric
+      ? r.monthsLeft <= 0
+        ? '当前存款已无法覆盖本月支出'
+        : `${r.yearsLeft} 年 ${r.remainingMonths} 个月${r.depletionDate ? ` · 耗尽于 ${formatDate(r.depletionDate)}` : ''}`
+      : r.isSustainable ? '当前现金流不会耗尽存款（不考虑大额突发支出）' : `模拟 ${Config.LIMITS.maxSimMonths / 12} 年仍未耗尽` }),
+    burnRow,
+    totals,
+    r.note ? h('p', { class: 'result-note', text: r.note }) : null,
+    stressTable
+      ? h('div', { class: 'stress-wrap' }, [
+          h('h4', { class: 'stress-wrap__title', text: '压力测试（不利情景）' }),
+          stressTable.root,
+        ])
+      : null,
+  ]);
+}
+
+export function renderSavingsSection(container, ctx) {
+  container.replaceChildren(sectionHead('存款生存计算器', 'wallet'));
+
+  const cfg = ctx.state.savingsCfg;
+  const inflationPlaceholder = String(ctx.state.settings.inflationRate ?? Config.DEFAULTS.inflationRate);
+
+  const fields = SAVINGS_FIELDS.map((f) =>
+    createField({
+      id: f.id,
+      label: f.label,
+      type: 'number',
+      value: cfg ? cfg[f.key] ?? '' : '',
+      unit: f.unit,
+      min: f.min,
+      step: f.step,
+      placeholder: f.placeholder,
+      inputmode: 'decimal',
+      onChange: (e) => commit(e),
+    }),
+  );
+  const inflationField = createField({
+    id: 'f-inflation',
+    label: '年化通胀率',
+    type: 'number',
+    value: cfg ? cfg.inflationRate ?? '' : '',
+    unit: '%',
+    min: 0,
+    max: 100,
+    step: 0.1,
+    placeholder: inflationPlaceholder,
+    hint: '支出按该年率逐月递增，仅作机械模拟，非预测。',
+    onChange: (e) => commit(e),
+  });
+
+  function fieldValues() {
+    const [savings, monthlyExpense, monthlyIncome] = fields.map((f) => f.input.value.trim());
+    return { savings, monthlyExpense, monthlyIncome, inflationRate: inflationField.input.value.trim() };
+  }
+  function commit(e) {
+    [...fields, inflationField].forEach((f) => f.setError(null));
+    const hint = e?.relatedTarget?.id || null;
+    const err = ctx.actions.onSavingsCommit(fieldValues(), hint);
+    if (err) {
+      const map = {
+        savings: fields[0],
+        monthlyExpense: fields[1],
+        monthlyIncome: fields[2],
+        inflationRate: inflationField,
+      };
+      if (map[err.field]) map[err.field].setError(err.message);
+    }
+  }
+
+  const inputCard = h('div', { class: 'card form-card' }, [
+    h('h3', { class: 'card__title', text: '输入参数' }),
+    h('div', { class: 'form-grid' }, fields.map((f) => f.root)),
+    inflationField.root,
+  ]);
+
+  const resultCard = h('div', { class: 'card result-card' }, [
+    h('h3', { class: 'card__title', text: '测算结果' }),
+    renderSavingsResults(ctx),
+  ]);
+
+  const grid = h('div', { class: 'savings-grid' }, [inputCard, resultCard]);
+
+  if (!cfg) {
+    const banner = h('p', { class: 'inline-banner', text: '还没有存款数据 —— 填写左侧参数后失焦即自动保存与计算。' });
+    container.append(banner, grid);
+  } else {
+    container.appendChild(grid);
+  }
+  return null;
+}
+
+/* ---------------- 设置抽屉 ---------------- */
+
+let settingsOpen = false;
+
+export function renderSettingsSection(container, ctx, ui) {
+  const settings = ctx.state.settings;
+
+  const symbolField = createField({
+    id: 'f-currency',
+    label: '货币符号',
+    type: 'text',
+    value: settings.currencySymbol ?? Config.DEFAULTS.currencySymbol,
+    placeholder: Config.DEFAULTS.currencySymbol,
+    hint: '显示在金额前，最多 3 个字符',
+    onChange: (e) => commit(e),
+  });
+  symbolField.input.setAttribute('maxlength', '3');
+
+  const inflationField = createField({
+    id: 'f-default-inflation',
+    label: '默认年化通胀率',
+    type: 'number',
+    value: settings.inflationRate ?? Config.DEFAULTS.inflationRate,
+    unit: '%',
+    min: 0,
+    max: 100,
+    step: 0.1,
+    hint: '新建存款测算时使用的默认值',
+    onChange: (e) => commit(e),
+  });
+
+  // 主题：当前仅暗色，保留 UI 占位但不切换
+  const themeSelect = h('select', {
+    id: 'f-theme',
+    class: 'field__input',
+    disabled: true,
+  }, [
+    h('option', { value: 'dark', text: '暗色（当前）' }),
+    h('option', { value: 'auto', text: '跟随系统（预留）' }),
+  ]);
+  themeSelect.value = 'dark';
+  const themeField = h('div', { class: 'field' }, [
+    h('label', { class: 'field__label', for: 'f-theme', text: '主题' }),
+    h('div', { class: 'field__control' }, [themeSelect]),
+    h('p', { class: 'field__hint', text: '当前版本仅提供暗色主题' }),
+  ]);
+
+  function commit(e) {
+    symbolField.setError(null);
+    inflationField.setError(null);
+    const hint = e?.relatedTarget?.id || null;
+    const err = ctx.actions.onSettingsCommit({
+      currencySymbol: symbolField.input.value.trim(),
+      inflationRate: inflationField.input.value.trim(),
+    }, hint);
+    if (err) {
+      const map = { currencySymbol: symbolField, inflationRate: inflationField };
+      if (map[err.field]) map[err.field].setError(err.message);
+    }
+  }
+
+  const exportBtn = h('button', {
+    type: 'button',
+    class: 'btn btn--ghost',
+    onclick: () => ctx.actions.exportData(),
+  }, [icon('export', 16), h('span', { text: '导出 JSON' })]);
+  const importBtn = h('button', {
+    type: 'button',
+    class: 'btn btn--ghost',
+    onclick: () => ctx.actions.importData(),
+  }, [icon('import', 16), h('span', { text: '导入 JSON' })]);
+  const resetBtn = h('button', {
+    type: 'button',
+    class: 'btn btn--ghost btn--danger-text',
+    onclick: () => ctx.actions.resetSettings(),
+  }, [icon('trash', 16), h('span', { text: '重置偏好为默认' })]);
+
+  const body = h('div', { class: `drawer__body${settingsOpen ? ' is-open' : ''}` }, [
+    h('div', { class: 'drawer__inner' }, [
+      h('div', { class: 'form-grid form-grid--3' }, [
+        symbolField.root, inflationField.root, themeField,
+      ]),
+      h('div', { class: 'drawer__actions' }, [exportBtn, importBtn, resetBtn]),
+    ]),
+  ]);
+
+  const toggleBtn = h('button', {
+    type: 'button',
+    class: 'drawer__toggle',
+    'aria-expanded': settingsOpen ? 'true' : 'false',
+    'aria-controls': 'settings-body',
+    onclick: () => {
+      settingsOpen = !settingsOpen;
+      body.classList.toggle('is-open', settingsOpen);
+      toggleBtn.setAttribute('aria-expanded', settingsOpen ? 'true' : 'false');
+      toggleBtn.classList.toggle('is-open', settingsOpen);
+    },
+  }, [
+    h('span', { class: 'drawer__toggle-left' }, [icon('settings', 18), h('span', { text: '设置与偏好' })]),
+    h('span', { class: `drawer__chevron${settingsOpen ? ' is-open' : ''}` }, [icon('chevron', 18)]),
+  ]);
+  toggleBtn.classList.toggle('is-open', settingsOpen);
+  body.id = 'settings-body';
+
+  container.replaceChildren(
+    h('section', { class: 'card drawer', 'aria-label': '设置与偏好' }, [toggleBtn, body]),
+  );
+}
