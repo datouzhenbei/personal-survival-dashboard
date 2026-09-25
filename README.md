@@ -27,6 +27,8 @@ personal-survival-dashboard/
 │   │   └── index.js        # 统一导出
 │   └── ui/                 # UI 层（前端生成）
 ├── assets/
+├── scripts/
+│   └── push.ps1            # 本机专用推送脚本（见「推送」一节）
 ├── UI-REQUIREMENTS.md      # 前端 UI 需求文档
 ├── README.md
 └── .gitignore
@@ -66,6 +68,24 @@ npx serve .                    # 或 npx http-server -p 8123
 
 - 站点：https://datouzhenbei.github.io/personal-survival-dashboard/
 - 仓库：https://github.com/datouzhenbei/personal-survival-dashboard
+
+## 推送（本机特殊情况）
+
+本机 Windows 上 `git-remote-https.exe` 在**派生凭据助手子进程**时会稳定崩溃
+（Windows 应用日志：异常代码 `0xc0000005`；表现为**退出码 128 且无任何输出**）。
+
+已排查结论：与 Git 版本无关（2.48.1 / 2.55.0.3 表现一致）、与代理无关、与用哪个凭据助手无关
+（GCM、gh 助手均崩），且在沙箱外同样复现；不需要认证的 `fetch` / `ls-remote` 因从不派生子进程而始终正常。
+
+因此**不要用普通的 `git push`**，改用仓库自带脚本（凭据内联 + 禁用助手，全程不派生子进程）：
+
+```powershell
+powershell -ExecutionPolicy Bypass -File scripts\push.ps1            # 推送当前分支
+powershell -ExecutionPolicy Bypass -File scripts\push.ps1 main v1.0.0  # 推送指定 ref
+```
+
+脚本会先设置 Clash Verge 代理（`127.0.0.1:7897`，GitHub 直连会 `unexpected EOF`），
+再从 `gh auth token` 实时读取凭据，**不落盘**。
 
 ## 免责声明
 
