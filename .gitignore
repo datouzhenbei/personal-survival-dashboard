@@ -1,0 +1,22 @@
+# 依赖与构建产物（本项目无构建，预留）
+node_modules/
+dist/
+build/
+
+# 编辑器与系统文件
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
+*.swp
+*.swo
+
+# 日志与临时
+*.log
+*.tmp
+.env
+.env.local
+
+# 备份与导出（用户运行时产生的本地备份）
+*.bak.json
+exports/
